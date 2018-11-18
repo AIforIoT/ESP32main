@@ -21,6 +21,8 @@ const int VOLUME    = 1;
 const int DATA      = 2;
 
 volatile int state=NODATA;
+SemaphoreHandle_t dataSemaphore = NULL;
+String data = "";
 
 //TASK HANDLES DEFINITIONS
 TaskHandle_t Beacons;
@@ -156,19 +158,22 @@ void codeForClient( void * parameter){
             // send the HTTP request:
 
             //Send information
-            client.println(makeHTTPrequest("GET","/index.html","text/plain",""));
+            client.println(makeHTTPrequest("POST","/index.html","text/plain",data));
             Serial.println("Post end");
         }else{
             // if you couldn't make a connection:
             Serial.println("connection failed");
         }
-        delay(3000);
+        //After finishing goes to sleep
+        vTaskSuspend(esp32Client);
     }
 }//END code for client
 
 void setup(){
 
     Serial.begin(115200);
+
+    vSemaphoreCreateBinary( dataSemaphore );
 
     while (status != WL_CONNECTED) {
         Serial.print("Attempting to connect to SSID: ");
@@ -229,10 +234,20 @@ void loop(){
 
 //Auxiliary functions
 String makeHTTPrequest(String method, String uri, String type, String data){
+  
+    String dataToSend = "";
+    if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
+    {      
+        // We were able to obtain the semaphore and can now access the
+        // shared resource.
+        dataToSend = data;   //We make a local copy
+        // We have finished accessing the shared resource.  Release the
+        // semaphore.
+        xSemaphoreGive( dataSemaphore );
+    }
     String postHeader=
     method+" "+uri+"HTTP/1.0\n"
     "content-type: "+type+"\n"
-    "content-Length: "+data.length()+"\n";
-
-    return postHeader+data+"\n";
+    "content-Length: "+dataToSend.length()+"\n";
+    return postHeader+dataToSend+"\n";
 }
