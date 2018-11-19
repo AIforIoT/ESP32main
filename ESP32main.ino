@@ -271,7 +271,7 @@ String makeHTTPrequest(String method, String uri, String type, String data, Int6
     String postBody=
     "\"EOF\": \""+EOFtoSend.toString()+"\",\n"
     "\"location\": \""+localitzationToSend+"\",\n"
-    "\"data\": \""+dataToSend+"\"\n,"
+    "\"data\": \""+dataToSend+"\"\n";
 
     return postHeader+postBody";
 }
