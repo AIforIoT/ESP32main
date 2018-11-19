@@ -158,7 +158,11 @@ void codeForClient( void * parameter){
             // send the HTTP request:
 
             //Send information
-            client.println(makeHTTPrequest("POST","/index.html","text/plain",data));
+            switch (state) {
+                case VOLUME:    client.println(makeHTTPrequest("POST","/volume","text/plain",data));
+                case DATA:      client.println(makeHTTPrequest("POST","/audio","text/plain",data));
+                case default:   client.println(makeHTTPrequest("POST","/error","text/plain",data));
+            }
             Serial.println("Post end");
         }else{
             // if you couldn't make a connection:
@@ -234,10 +238,10 @@ void loop(){
 
 //Auxiliary functions
 String makeHTTPrequest(String method, String uri, String type, String data){
-  
+
     String dataToSend = "";
     if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
-    {      
+    {
         // We were able to obtain the semaphore and can now access the
         // shared resource.
         dataToSend = data;   //We make a local copy
