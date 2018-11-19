@@ -15,20 +15,22 @@ WiFiClient client;
 // Initialize the Wifi server library
 WiFiServer server(80);
 
-//GLOBAL VARIABLES
+//GLOBAL STATES DEFINITIONS
 const int NODATA    = 0;
 const int VOLUME    = 1;
 const int DATA      = 2;
-
-volatile int state=NODATA;
+volatile int state=NODATA; //INITIAL STATE
+//GLOBAL DATA VARIABLES
 SemaphoreHandle_t dataSemaphore = NULL;
 String data = "";
+int64_t localitzationDelta;
+boolean EndOfFile;
 
 //TASK HANDLES DEFINITIONS
 TaskHandle_t Beacons;
 TaskHandle_t MicroInput;
 TaskHandle_t esp32Server;
-TaskHandle_t esp32Client; //IMPORTANT: Perhaps this thread is not necessary, maybe it can be included in MicroInput Thread.
+TaskHandle_t esp32Client;
 
 void codeForBeacons( void * parameter){
     //Code goes here
@@ -159,14 +161,21 @@ void codeForClient( void * parameter){
 
             //Send information
             switch (state) {
-                case VOLUME:    client.println(makeHTTPrequest("POST","/volume","text/plain",data));
-                case DATA:      client.println(makeHTTPrequest("POST","/audio","text/plain",data));
-                case default:   client.println(makeHTTPrequest("POST","/error","text/plain",data));
+                case VOLUME:
+                    client.println(makeHTTPrequest("POST","/volume","text/plain",data, localitzationDelta));
+                    break;
+                case DATA:
+                    client.println(makeHTTPrequest("POST","/audio","text/plain",data , localitzationDelta));
+                    break;
+                default:
+                    client.println(makeHTTPrequest("POST","/error","text/plain",data , localitzationDelta));
+                    break;
             }
             Serial.println("Post end");
         }else{
             // if you couldn't make a connection:
             Serial.println("connection failed");
+            //FATAL ERROR
         }
         //After finishing goes to sleep
         vTaskSuspend(esp32Client);
@@ -237,14 +246,19 @@ void loop(){
 }
 
 //Auxiliary functions
-String makeHTTPrequest(String method, String uri, String type, String data){
+String makeHTTPrequest(String method, String uri, String type, String data, Int64_t localitzationDelta, boolean EndOfFile){
 
     String dataToSend = "";
+    Int64_t localitzationToSend;
+    boolean EOFtoSend;
     if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
     {
         // We were able to obtain the semaphore and can now access the
         // shared resource.
-        dataToSend = data;   //We make a local copy
+        //We make a local copy
+        dataToSend = data;
+        localitzationToSend=localitzationDelta;
+        EOFtoSend=EndOfFile;
         // We have finished accessing the shared resource.  Release the
         // semaphore.
         xSemaphoreGive( dataSemaphore );
@@ -253,5 +267,11 @@ String makeHTTPrequest(String method, String uri, String type, String data){
     method+" "+uri+"HTTP/1.0\n"
     "content-type: "+type+"\n"
     "content-Length: "+dataToSend.length()+"\n";
-    return postHeader+dataToSend+"\n";
+
+    String postBody=
+    "\"EOF\": \""+EOFtoSend.toString()+"\",\n"
+    "\"location\": \""+localitzationToSend+"\",\n"
+    "\"data\": \""+dataToSend+"\"\n,"
+
+    return postHeader+postBody";
 }
