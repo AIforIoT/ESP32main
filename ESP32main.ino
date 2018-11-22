@@ -6,10 +6,10 @@
 
 //WIFI DEFINITIONS
 int status = WL_IDLE_STATUS;
-const char* ssid     = "Aquaris X5 Plus";
-const char* password = "3cdb401cb5d6";
-const char* raspip = "216.58.214.164";  //www.google.com
-const int port = 80;
+const char* ssid     = "iouti_net";
+const char* password = "thenightmareofhackers";
+const char* raspip = "192.168.5.1";
+const int port = 8080;
 
 //INPUT DEFINITIONS
 #define CHANNEL 36
@@ -66,12 +66,16 @@ WiFiClient client;
 // Initialize the Wifi server library
 WiFiServer server(80);
 
-//GLOBAL VARIABLES
+//GLOBAL STATES DEFINITIONS
 const int NODATA    = 0;
 const int VOLUME    = 1;
 const int DATA      = 2;
-
-volatile int state=NODATA;
+volatile int state=NODATA; //INITIAL STATE
+//GLOBAL DATA VARIABLES
+SemaphoreHandle_t dataSemaphore = NULL;
+String data = "Hola TEST";
+int localitzationDelta=100;
+boolean EndOfFile;
 
 //TASK HANDLES DEFINITIONS
 TaskHandle_t Beacons;
@@ -79,7 +83,7 @@ TaskHandle_t MicroInput;
 TaskHandle_t FFT;
 TaskHandle_t Enviar;
 TaskHandle_t esp32Server;
-TaskHandle_t esp32Client; //IMPORTANT: Perhaps this thread is not necessary, maybe it can be included in MicroInput Thread.
+TaskHandle_t esp32Client;
 
 
 
@@ -88,7 +92,7 @@ void codeForBeacons( void * parameter){
     Serial.begin(115200);
     while(true){
         //Serial.println("Print from core 1,Beacon task test");
-        delay(500);
+        vTaskDelay(500);
     }
 }
 
@@ -156,6 +160,7 @@ void computeFFT(void *parameter){
       vReal[i] = wave[i];
       tramaFFT[i] = wave[i];
       vImag[i] = 0;
+
     }
   
     arduinoFFT FFT = arduinoFFT(); /* Create FFT object */
@@ -319,7 +324,7 @@ void codeForServer( void * parameter){
                         //DATA CODE GOES HERE...
                         state=DATA;
                         digitalWrite(18, HIGH);
-                        delay(2000);
+                        vTaskDelay(2000);
                         digitalWrite(18, LOW);
                         client.stop();
 
@@ -331,7 +336,7 @@ void codeForServer( void * parameter){
                         //NODATA CODE GOES HERE...
                         state=NODATA;
                         digitalWrite(18, HIGH);
-                        delay(2000);
+                        vTaskDelay(2000);
                         digitalWrite(18, LOW);
                         client.stop();
 
@@ -343,7 +348,7 @@ void codeForServer( void * parameter){
                         state=VOLUME;
                         //VOLUME CODE GOES HERE...
                         digitalWrite(19, HIGH);
-                        delay(2000);
+                        vTaskDelay(2000);
                         digitalWrite(19, LOW);
                         client.stop();
                     }
@@ -353,7 +358,7 @@ void codeForServer( void * parameter){
                     client.println("HTTP/1.1 405 Method Not Allowed");
                     client.println();
                     digitalWrite(21, HIGH);
-                    delay(2000);
+                    vTaskDelay(2000);
                     digitalWrite(21, LOW);
                     client.stop();
                 }
@@ -368,20 +373,32 @@ void codeForServer( void * parameter){
 void codeForClient( void * parameter){
     //Code goes here
     while(true){
+        vTaskSuspend(esp32Client);
         client.stop();
+        vTaskDelay(1000);
         //if there's a successful connection:
         if (client.connect(raspip, port)) {
             Serial.println("connecting...");
             // send the HTTP request:
-
+            vTaskDelay(100);
             //Send information
-            client.println(makeHTTPrequest("GET","/index.html","text/plain",""));
+            switch (state) {
+                case VOLUME:
+                    client.println(makeHTTPrequest("POST","/volume","application/json",data, localitzationDelta ,EndOfFile));
+                    break;
+                case DATA:
+                    client.println(makeHTTPrequest("POST","/audio","application/json",data , localitzationDelta, EndOfFile));
+                    break;
+                default:
+                    client.println(makeHTTPrequest("POST","/error","application/json",data , localitzationDelta, EndOfFile));
+                    break;
+            }
             Serial.println("Post end");
         }else{
             // if you couldn't make a connection:
             Serial.println("connection failed");
+            //FATAL ERROR
         }
-        delay(3000);
     }
 }//END code for client
 
@@ -391,6 +408,8 @@ void setup(){
 
     Serial.begin(115200);
     sampling_period_us = round(1000000*(1.0/samplingFrequency));
+
+    vSemaphoreCreateBinary( dataSemaphore );
 
     while (status != WL_CONNECTED) {
         Serial.print("Attempting to connect to SSID: ");
@@ -456,6 +475,7 @@ void setup(){
         1);                         //core
 
     vTaskSuspend(Enviar);
+
 }
 
 void loop(){
@@ -465,19 +485,43 @@ void loop(){
             //Serial.write(c);
 //    }
     while(true){
-        Serial.println(state);
+        //Serial.println(state);
     }
-    delay(5000);
+    vTaskDelay(5000);
 }
 
 //Auxiliary functions
-String makeHTTPrequest(String method, String uri, String type, String data){
-    String postHeader=
-    method+" "+uri+"HTTP/1.0\n"
-    "content-type: "+type+"\n"
-    "content-Length: "+data.length()+"\n";
+String makeHTTPrequest(String method, String uri, String type, String data, int localitzationDelta, boolean EndOfFile){
+    Serial.print("POST REQUESTSEND");
+    String dataToSend = "";
+    String localitzationToSend="";
+    String postBody="";
+    boolean EOFtoSend;
+    if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
+    {
+        // We were able to obtain the semaphore and can now access the
+        // shared resource.
+        //We make a local copy
+        dataToSend = data;
+        localitzationToSend = String(localitzationDelta);
+        EOFtoSend=EndOfFile;
+        // We have finished accessing the shared resource.  Release the
+        // semaphore.
+        xSemaphoreGive( dataSemaphore );
+    }
+    postBody=postBody+
+    "{\n"
+    " \"EOF\": \""+EOFtoSend+"\",\n"
+    " \"location\": \""+ localitzationToSend +"\",\n"
+    " \"data\": \""+dataToSend+"\"\n"
+    "}\n";
 
-    return postHeader+data+"\n";
+    String postHeader=
+    method+" "+uri+" HTTP/1.0\n"
+    "content-type: "+type+"\n"
+    "content-Length: "+postBody.length()+"\n\n";
+
+    return postHeader+postBody;
 }
 
 
