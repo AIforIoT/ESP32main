@@ -282,16 +282,7 @@ String makeHTTPrequest(String method, String uri, String type, String data, int 
     String postHeader=
     method+" "+uri+" HTTP/1.0\n"
     "content-type: "+type+"\n"
-<<<<<<< HEAD
     "content-Length: "+postBody.length()+"\n\n";
-=======
-    "content-Length: "+dataToSend.length()+"\n";
-
-    String postBody=
-    "\"EOF\": \""+EOFtoSend.toString()+"\",\n"
-    "\"location\": \""+localitzationToSend+"\",\n"
-    "\"data\": \""+dataToSend+"\"\n";
->>>>>>> 6b3d5dabc306fcffb49a6f057ea7f2f1d7844bc3
 
     return postHeader+postBody;
 }
