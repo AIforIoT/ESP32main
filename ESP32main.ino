@@ -5,86 +5,93 @@
 #include "string.h"
 
 //WIFI DEFINITIONS
-int status = WL_IDLE_STATUS;
-const char* ssid     = "iouti_net";
-const char* password = "thenightmareofhackers";
-const char* raspip = "192.168.5.1";
-const int port = 8080;
+
+    int status = WL_IDLE_STATUS;
+    const char* ssid     =    "Aquaris X5 Plus";            //"iouti_net";
+    const char* password =    "3cdb401cb5d6";               //"thenightmareofhackers";
+    const char* raspip =      "192.168.43.81";              //"192.168.5.1";
+    const int port = 8080;
+
 
 //INPUT DEFINITIONS
-#define CHANNEL 36
-const uint16_t samples = 1024; //This value MUST ALWAYS be a power of 2
-const int Nwave = 1024;
-const double samplingFrequency = 16000; //Hz
+    #define CHANNEL 36
+    #define SCL_INDEX 0x00
+    #define SCL_TIME 0x01
+    #define SCL_FREQUENCY 0x02
+    #define SCL_PLOT 0x03
+    const uint16_t samples = 1024; //This value MUST ALWAYS be a power of 2
+    const int Nwave = 1024;
+    const double samplingFrequency = 16000; //Hz
 
-//INPUT VARIABLES
-unsigned int sampling_period_us;
-unsigned long microsecondsFFT;
-unsigned long microsecondsLectura;
-boolean esVoz = 0;
-int contNoVoz = 0;
-int tramas4Segundos = 32;
-volatile boolean calcularFFT = 1;
-int numTramaFFT = 0;
-int numTramaLectura = 0;
-volatile boolean tramaNueva = 0;
-volatile boolean concatenar;
-double volumen;
-volatile int state_env;  // 0: Envia volumen
-                         // 1: Espera respuesta
-                         // 2: Envia audio
-//int quieroAudio = 0;   // 0: No tengo respuesta, 1: Quiero audio, 2: No quiero audio
-volatile int numTramasGuardadas = 0;
-const int tramas1Segundo = 16;
-volatile boolean silencio = 0; 
-boolean quieroVolumen;
-int tramas10Segundos = 156;
-int numTramasEnviadas;
+    //INPUT VARIABLES
+    unsigned int sampling_period_us;
+    unsigned long microsecondsFFT;
+    unsigned long microsecondsLectura;
+    boolean isVoice = 0;
+    int noVoiceCounter = 0;
+    int tramas4Segundos = 32;
+    volatile boolean calcularFFT = 1;
+    int numTramaFFT = 0;
+    int numTramaLectura = 0;
+    volatile boolean tramaNueva = 0;
+    volatile boolean concat;
+    double volumen;
+    volatile int numTramasGuardadas = 0;
+    const int tramas1Segundo = 16;
+    volatile boolean silencio = 0;
+    boolean quieroVolumen;
+    int tramas10Segundos = 156;
+    int numTramasEnviadas;
 
-/*
-These are the input and output vectors
-Input vectors receive computed results from FFT
-*/
-double vReal[samples];
-double vImag[samples];
-double tramaFFT[Nwave];
-double wave[Nwave];
-String waveAntS;
-String waveAntS2;
-String audioGuardado;
-String waveString;
-
-
-#define SCL_INDEX 0x00
-#define SCL_TIME 0x01
-#define SCL_FREQUENCY 0x02
-#define SCL_PLOT 0x03
+    /*
+    These are the input and output vectors
+    Input vectors receive computed results from FFT
+    */
+    double vReal[samples];
+    double vImag[samples];
+    double tramaFFT[Nwave];
+    double wave[Nwave];
+    String waveAntS;
+    String waveAntS2;
+    String savedAudio;
+    String waveString;
 
 
-// Initialize the Wifi client library
-WiFiClient client;
-// Initialize the Wifi server library
-WiFiServer server(80);
+//WIFI INIT
+
+    // Initialize the Wifi client library
+    WiFiClient client;
+    // Initialize the Wifi server library
+    WiFiServer server(80);
+
 
 //GLOBAL STATES DEFINITIONS
-const int NODATA    = 0;
-const int VOLUME    = 1;
-const int DATA      = 2;
-volatile int state=NODATA; //INITIAL STATE
-//GLOBAL DATA VARIABLES
-SemaphoreHandle_t dataSemaphore = NULL;
-String data = "Hola TEST";
-int localitzationDelta=100;
-boolean EndOfFile;
+
+    const int IDLE              = 0;
+    const int VOLUME            = 1;
+    const int WAITRESPONSE      = 2;
+    const int AUDIO             = 3;
+    volatile int state_env      = IDLE;
+    volatile boolean raspiListening=    true;
+
+
+//GLOBAL STATE VARIABLES
+
+    SemaphoreHandle_t dataSemaphore = NULL;
+    SemaphoreHandle_t stateSemaphore = NULL;
+    String data = "";
+    int localitzationDelta=100;
+    boolean EndOfFile;
+
 
 //TASK HANDLES DEFINITIONS
-TaskHandle_t Beacons;
-TaskHandle_t MicroInput;
-TaskHandle_t FFT;
-TaskHandle_t Enviar;
-TaskHandle_t esp32Server;
-TaskHandle_t esp32Client;
 
+    TaskHandle_t Beacons;
+    TaskHandle_t MicroInput;
+    TaskHandle_t FFT;
+    TaskHandle_t Enviar;
+    TaskHandle_t esp32Server;
+    TaskHandle_t esp32Client;
 
 
 void codeForBeacons( void * parameter){
@@ -101,10 +108,10 @@ void codeForMicroInput( void * parameter){
   while(true){
 
     /*SAMPLING*/
-      microsecondsLectura = micros(); 
+      microsecondsLectura = micros();
       numTramaLectura++;
-              
-      
+
+
      for(int i=0; i<Nwave; i++) //Bucle que lee Nwave muestras de audio
      {
         tramaNueva = 0;
@@ -118,43 +125,42 @@ void codeForMicroInput( void * parameter){
         }
         long t1 = micros();
      }
-    
-      
-     if (!concatenar){
+
+     if (!concat){
      //Guardar tramas anteriores
       waveAntS2 = waveAntS;
       waveAntS = waveString;
-      audioGuardado = waveAntS2 + waveAntS + waveString;
+      savedAudio = waveAntS2 + waveAntS + waveString;
       numTramasGuardadas = 3;
-                        
+
      }else{
      //Concantenar el audio que vas recibiendo
-      audioGuardado += waveString;
+      savedAudio += waveString;
       //Serial.println("Concatenando...");
       numTramasGuardadas++;
      }
-              
+
     calcularFFT = !calcularFFT;
     tramaNueva = 1;
-  
-    long t2 = micros() - microsecondsLectura;           
+
+    long t2 = micros() - microsecondsLectura;
     long fm = 1000000*Nwave/t2;
-    
+
   }
 }
 
 void computeFFT(void *parameter){
-       
+
 
   while(true){
-  
+
    while(calcularFFT != 1 || tramaNueva != 1){
-      
+
    }
-  
+
     numTramaFFT = numTramaFFT + 2;
     microsecondsFFT = micros();
-     
+
    for(int i=0; i<samples; i++) //Bucle que lee 1024 muestras de audio
     {
       vReal[i] = wave[i];
@@ -162,19 +168,19 @@ void computeFFT(void *parameter){
       vImag[i] = 0;
 
     }
-  
+
     arduinoFFT FFT = arduinoFFT(); /* Create FFT object */
-            
+
     FFT.Windowing(vReal, samples, FFT_WIN_TYP_HAMMING, FFT_FORWARD);  /* Weigh data */
     FFT.Compute(vReal, vImag, samples, FFT_FORWARD); /* Compute FFT */
     FFT.ComplexToMagnitude(vReal, vImag, samples); /* Compute magnitudes */
       //Freq + alta 4482.421875Hz
     double x = FFT.MajorPeak(vReal, samples, samplingFrequency);
-            
+
     if(x > 85.0 && x < 255.0){
         Serial.println("Voz");
-        esVoz = 1;
-        contNoVoz = 0;
+        isVoice = 1;
+        noVoiceCounter = 0;
         volumen = computeVolume(tramaFFT);
 
         /*Serial.println("Quieres recibir volumen?");
@@ -185,34 +191,34 @@ void computeFFT(void *parameter){
           quieroVolumen = 0;
         }*/
 
-        if(state = VOLUME){
-            concatenar = 1;
+        if(state_env = VOLUME){
+            concat = 1;
             state_env = 1;
-            vTaskResume(Enviar);       
+            vTaskResume(Enviar);
         }
-           
+
     }else{
       Serial.println("Otra cosa");
-      esVoz = 0;
-      contNoVoz++;                        
+      isVoice = 0;
+      noVoiceCounter++;
     }
-    
+
     //Para de enviar cuando pasan 4 segundos de silencio o maximo 10 segundos de voz
-    if(state_env == 3 && (numTramasEnviadas >= tramas10Segundos || contNoVoz >= tramas4Segundos)){
-      Serial.println("Enviado");      
+    if(state_env == 3 && (numTramasEnviadas >= tramas10Segundos || noVoiceCounter >= tramas4Segundos)){
+      Serial.println("Enviado");
       vTaskSuspend(Enviar);
-      contNoVoz = 0;
+      noVoiceCounter = 0;
       state_env = 0;
-      concatenar = 0;
+      concat = 0;
       numTramasEnviadas = 0;
     }
-    
+
     long tiempo = micros() - microsecondsFFT;
     tramaNueva = 0;
 
-  } 
-         
-  
+  }
+
+
 }
 
 void enviar(void *parameter){
@@ -222,65 +228,64 @@ void enviar(void *parameter){
       switch (state_env){
       case 0:
               // No hacer nada de nada de res de res
-        break;  
+        break;
       case 1: { /*Enviar volumen*/
-        //Assignar volumen a la variable 
+        //Assignar volumen a la variable
         vTaskResume(esp32Client);
         state_env = 2;
       }
-        break;      
+        break;
       case 2: { /*Esperar*/
-              
+
         //Serial.println("---->¿Quieres audio?");
         // Esperar respuesta
 
-        if(state == DATA){
+        if(state_env == WAITRESPONSE){
            state_env = 3;
-           //Guardar audioGuardado en la variable global
+           //Guardar savedAudio en la variable global
            vTaskResume(esp32Client);
-           audioGuardado = "";  //Envia el audio que ha ido guardando desde la detección
-           numTramasGuardadas = 0;              
-        }else if(state == NODATA){
+           savedAudio = "";  //Envia el audio que ha ido guardando desde la detección
+           numTramasGuardadas = 0;
+        }else if(state_env == IDLE){
            state_env = 0;
-           concatenar = 0;
+           concat = 0;
            //Serial.println("No quiero audio");
-        }               
+        }
       }
-        break;        
+        break;
       case 3: { /*Enviar data*/
         while( numTramasGuardadas < tramas1Segundo){ //Envia audio de 1 segundo cada vez
           //Empty loop
-          
-        }        
+
+        }
         numTramasEnviadas += numTramasGuardadas;
-        numTramasGuardadas = 0; 
-        //Guardar audioGuardado en la variable global
+        numTramasGuardadas = 0;
+        //Guardar savedAudio en la variable global
         //Guardar numTramasEnviadas también?
-        vTaskResume(esp32Client);           
+        vTaskResume(esp32Client);
       }
-        break;       
+        break;
       default: {
         state_env = 0;
-      }break;             
-      
+      }break;
+
     }
 
-  }  
-         
+  }
+
 }
 
-
 void codeForServer( void * parameter){
-    pinMode(5, OUTPUT);      // set the RELAY pin mode
+    pinMode(5, OUTPUT);       // set the RELAY pin mode
     pinMode(18, OUTPUT);      // set the RELAY pin mode
     pinMode(19, OUTPUT);      // set the RELAY pin mode
     pinMode(21, OUTPUT);      // set the RELAY pin mode
     server.begin();
-    delay(2000);
+    vTaskDelay(2000);
     Serial.println("Server started");
     Serial.print("Server is at ");
     Serial.println(WiFi.localIP());
-    delay(2000);
+    vTaskDelay(2000);
     char c;
     //Loop
     while(true){
@@ -316,55 +321,64 @@ void codeForServer( void * parameter){
 
 
                     }else if (currentLine.endsWith("GET /data/on ")) {
-                        // DATA REQUEST FROM RASPI
+                        // AUDIO DATA REQUEST FROM RASPI
                         client.println("HTTP/1.1 200 OK");
                         client.println();
-                        //Serial.println("DATA request detected");
-
-                        //DATA CODE GOES HERE...
-                        state=DATA;
-                        digitalWrite(18, HIGH);
-                        vTaskDelay(2000);
-                        digitalWrite(18, LOW);
+                        if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
+                        {
+                            // We were able to obtain the semaphore and can now access the
+                            // shared resource.
+                            state_env=AUDIO;
+                            // We have finished accessing the shared resource.  Release the
+                            // semaphore.
+                            xSemaphoreGive( stateSemaphore );
+                        }
+                        Serial.print("DATAON");
                         client.stop();
 
                      }else if (currentLine.endsWith("GET /data/off ")) {
-                        // DATA REQUEST FROM RASPI
+                        // AUDIO DATA NOT REQUESTED FROM RASPI
                         client.println("HTTP/1.1 200 OK");
                         client.println();
-                        //Serial.println("NODATA request detected");
-                        //NODATA CODE GOES HERE...
-                        state=NODATA;
-                        digitalWrite(18, HIGH);
-                        vTaskDelay(2000);
-                        digitalWrite(18, LOW);
+                        if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
+                        {
+                            // We were able to obtain the semaphore and can now access the
+                            // shared resource.
+                            state_env=IDLE;
+                            raspiListening=false;
+                            // We have finished accessing the shared resource.  Release the
+                            // semaphore.
+                            xSemaphoreGive( stateSemaphore );
+                        }
+                        Serial.print("DATAOFF");
                         client.stop();
 
                     }else if (currentLine.endsWith("GET /volume ")) {
-                        // DATA REQUEST FROM RASPI
+                        // VOLUME REQUEST FROM RASPI
                         client.println("HTTP/1.1 200 OK");
                         client.println();
                         Serial.println("VOLUME request detected");
-                        state=VOLUME;
-                        //VOLUME CODE GOES HERE...
-                        digitalWrite(19, HIGH);
-                        vTaskDelay(2000);
-                        digitalWrite(19, LOW);
+                        if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
+                        {
+                            // We were able to obtain the semaphore and can now access the
+                            // shared resource.
+                            raspiListening=true;
+                            // We have finished accessing the shared resource.  Release the
+                            // semaphore.
+                            xSemaphoreGive( stateSemaphore );
+                        }
                         client.stop();
+                        Serial.print("VOLUME");
                     }
 
                 }else{  //End of first request line , no accepted get requested
                     //Error 405 Method Not Allowed
                     client.println("HTTP/1.1 405 Method Not Allowed");
                     client.println();
-                    digitalWrite(21, HIGH);
-                    vTaskDelay(2000);
-                    digitalWrite(21, LOW);
                     client.stop();
                 }
             }
             // close the connection:
-
             Serial.println("Client Disconnected.");
         }
     }//END WHILE
@@ -382,12 +396,32 @@ void codeForClient( void * parameter){
             // send the HTTP request:
             vTaskDelay(100);
             //Send information
-            switch (state) {
+            switch (state_env) {
                 case VOLUME:
                     client.println(makeHTTPrequest("POST","/volume","application/json",data, localitzationDelta ,EndOfFile));
+                    if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
+                    {
+                            // We were able to obtain the semaphore and can now access the
+                            // shared resource.
+                            state_env=WAITRESPONSE;
+                            // We have finished accessing the shared resource.  Release the
+                            // semaphore.
+                            xSemaphoreGive( stateSemaphore );
+                    }
                     break;
-                case DATA:
+                case WAITRESPONSE:
                     client.println(makeHTTPrequest("POST","/audio","application/json",data , localitzationDelta, EndOfFile));
+                    if(EndOfFile==true){
+                        if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
+                        {
+                            // We were able to obtain the semaphore and can now access the
+                            // shared resource.
+                            state_env=IDLE;
+                            // We have finished accessing the shared resource.  Release the
+                            // semaphore.
+                            xSemaphoreGive( stateSemaphore );
+                        }
+                    }
                     break;
                 default:
                     client.println(makeHTTPrequest("POST","/error","application/json",data , localitzationDelta, EndOfFile));
@@ -397,19 +431,30 @@ void codeForClient( void * parameter){
         }else{
             // if you couldn't make a connection:
             Serial.println("connection failed");
+            if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
+            {
+                // We were able to obtain the semaphore and can now access the
+                // shared resource.
+                state_env=IDLE;
+                raspiListening=false;
+                // We have finished accessing the shared resource.  Release the
+                // semaphore.
+                xSemaphoreGive( stateSemaphore );
+            }
             //FATAL ERROR
         }
     }
 }//END code for client
 
 
-
+//Start execution
 void setup(){
 
     Serial.begin(115200);
     sampling_period_us = round(1000000*(1.0/samplingFrequency));
 
     vSemaphoreCreateBinary( dataSemaphore );
+    vSemaphoreCreateBinary( stateSemaphore );
 
     while (status != WL_CONNECTED) {
         Serial.print("Attempting to connect to SSID: ");
@@ -437,7 +482,7 @@ void setup(){
         &MicroInput,                //Task handle to keep track of created task
         0);                         //core
 
-   
+
    xTaskCreatePinnedToCore(
         computeFFT,             //Task function
         "FFT",                 //name of task
@@ -477,7 +522,7 @@ void setup(){
     vTaskSuspend(Enviar);
 
 }
-
+//DO NOTHING IN LOOP
 void loop(){
     // send it out the serial port.This is for debugging purposes only:
 //    while (client.available()) {
@@ -485,7 +530,7 @@ void loop(){
             //Serial.write(c);
 //    }
     while(true){
-        //Serial.println(state);
+        //Serial.println(state_env);
     }
     vTaskDelay(5000);
 }
@@ -523,16 +568,14 @@ String makeHTTPrequest(String method, String uri, String type, String data, int 
 
     return postHeader+postBody;
 }
-
-
-double computeVolume(double *wave){  
+double computeVolume(double *wave){
     double sumP = 0;
     double pot = 0;
-    for(int i=0; i<Nwave; i++){  
-        sumP = sumP + (wave[i]*wave[i]);      
-    }    
-    pot = sumP/Nwave;   
-    sumP = 0;  
+    for(int i=0; i<Nwave; i++){
+        sumP = sumP + (wave[i]*wave[i]);
+    }
+    pot = sumP/Nwave;
+    sumP = 0;
     return pot;
-    
+
 }
