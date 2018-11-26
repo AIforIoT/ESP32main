@@ -7,9 +7,12 @@
 //WIFI DEFINITIONS
 
     int status = WL_IDLE_STATUS;
-    const char* ssid     =    "Aquaris X5 Plus";            //"iouti_net";
-    const char* password =    "3cdb401cb5d6";               //"thenightmareofhackers";
-    const char* raspip =      "192.168.43.81";              //"192.168.5.1";
+//    const char* ssid     =    "iouti_net";              
+//    const char* password =    "thenightmareofhackers";  
+//    const char* raspip =      "192.168.5.1";           
+    const char* ssid     =    "Aquaris X5 Plus";              
+    const char* password =    "3cdb401cb5d6";  
+    const char* raspip =      "192.168.43.81";           
     const int port = 8080;
 
 
@@ -93,6 +96,10 @@
     TaskHandle_t esp32Server;
     TaskHandle_t esp32Client;
 
+//HARDWARE INIT
+
+
+
 
 void codeForBeacons( void * parameter){
     //Code goes here
@@ -121,9 +128,10 @@ void codeForMicroInput( void * parameter){
 
         long t0 = micros();
         while(micros() - microsecondsLectura < sampling_period_us){ //Espera a que haya pasado un periodo de muestreo
-           //empty loop
+           vTaskDelay(50);
         }
         long t1 = micros();
+        vTaskDelay(50);
      }
 
      if (!concat){
@@ -145,7 +153,7 @@ void codeForMicroInput( void * parameter){
 
     long t2 = micros() - microsecondsLectura;
     long fm = 1000000*Nwave/t2;
-
+    vTaskDelay(50);
   }
 }
 
@@ -155,7 +163,7 @@ void computeFFT(void *parameter){
   while(true){
 
    while(calcularFFT != 1 || tramaNueva != 1){
-
+      vTaskDelay(50);
    }
 
     numTramaFFT = numTramaFFT + 2;
@@ -215,7 +223,7 @@ void computeFFT(void *parameter){
 
     long tiempo = micros() - microsecondsFFT;
     tramaNueva = 0;
-
+    vTaskDelay(50);
   }
 
 
@@ -232,10 +240,10 @@ void enviar(void *parameter){
       case 1: { /*Enviar volumen*/
         //Assignar volumen a la variable
         vTaskResume(esp32Client);
-        state_env = 2;
+        state_env = 2; //error
       }
         break;
-      case 2: { /*Esperar*/
+      case 2: { /*Esperar*/ //error
 
         //Serial.println("---->¿Quieres audio?");
         // Esperar respuesta
@@ -276,10 +284,7 @@ void enviar(void *parameter){
 }
 
 void codeForServer( void * parameter){
-    pinMode(5, OUTPUT);       // set the RELAY pin mode
-    pinMode(18, OUTPUT);      // set the RELAY pin mode
-    pinMode(19, OUTPUT);      // set the RELAY pin mode
-    pinMode(21, OUTPUT);      // set the RELAY pin mode
+    
     server.begin();
     vTaskDelay(2000);
     Serial.println("Server started");
@@ -306,14 +311,14 @@ void codeForServer( void * parameter){
                     currentLine += c;      // add it to the end of the currentLine
                     // Check to see if the client request was "GET /H" or "GET /L":
                     if (currentLine.endsWith("GET /H ")) {
-                        digitalWrite(5, HIGH);               // GET /H turns the REALY on
+                        digitalWrite(33, HIGH);               // GET /H turns the REALY on
                         client.println("HTTP/1.1 200 OK");
                         client.println();
                         //Serial.println("H request detected");
                         client.stop();
 
                     }else if (currentLine.endsWith("GET /L ")) {
-                        digitalWrite(5, LOW);                // GET /L turns the RELAY off
+                        digitalWrite(33, LOW);                // GET /L turns the RELAY off
                         client.println("HTTP/1.1 200 OK");
                         client.println();
                         Serial.println("L request detected");
@@ -380,6 +385,7 @@ void codeForServer( void * parameter){
             }
             // close the connection:
             Serial.println("Client Disconnected.");
+            vTaskDelay(50);
         }
     }//END WHILE
 }//END code for server
@@ -396,6 +402,7 @@ void codeForClient( void * parameter){
             // send the HTTP request:
             vTaskDelay(100);
             //Send information
+            Serial.println("Information to send");
             switch (state_env) {
                 case VOLUME:
                     client.println(makeHTTPrequest("POST","/volume","application/json",data, localitzationDelta ,EndOfFile));
@@ -449,7 +456,8 @@ void codeForClient( void * parameter){
 
 //Start execution
 void setup(){
-
+    pinMode(33, OUTPUT);       // set the RELAY pin mode
+    pinMode(32, OUTPUT);      // set the RELAY pin mode
     Serial.begin(115200);
     sampling_period_us = round(1000000*(1.0/samplingFrequency));
 
@@ -463,15 +471,22 @@ void setup(){
         delay(2000);
     }
     Serial.println("Connected");
-
-    xTaskCreatePinnedToCore(
-        codeForBeacons,             //Task function
-        "Beacons",                  //name of task
-        1000,                       //Stack size of the task
-        NULL,                       //parameter of the task
-        1,                          //priority of the task
-        &Beacons,                   //Task handle to keep track of created task
-        1);                         //core
+    digitalWrite(33, HIGH);
+    delay(1000);
+    digitalWrite(33, LOW);
+    delay(1000);
+    digitalWrite(32, HIGH);
+    delay(1000);
+    digitalWrite(32, LOW);
+    delay(1000);
+//    xTaskCreatePinnedToCore(
+//        codeForBeacons,             //Task function
+//        "Beacons",                  //name of task
+//        1000,                       //Stack size of the task
+//        NULL,                       //parameter of the task
+//        1,                          //priority of the task
+//        &Beacons,                   //Task handle to keep track of created task
+//        1);                         //core
 
     xTaskCreatePinnedToCore(
         codeForMicroInput,          //Task function
@@ -529,10 +544,11 @@ void loop(){
 //            char c = client.read();
             //Serial.write(c);
 //    }
-    while(true){
+//    while(true){
         //Serial.println(state_env);
-    }
+//    }
     vTaskDelay(5000);
+    Serial.println(state_env);
 }
 
 //Auxiliary functions
