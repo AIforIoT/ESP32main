@@ -7,12 +7,21 @@
 //WIFI DEFINITIONS
 
     int status = WL_IDLE_STATUS;
+<<<<<<< HEAD
 //    const char* ssid     =    "iouti_net";
 //    const char* password =    "thenightmareofhackers";
 //    const char* raspip =      "192.168.5.1";
     const char* ssid     =    "Aquaris X5 Plus";
     const char* password =    "3cdb401cb5d6";
     const char* raspip =      "192.168.43.81";
+=======
+    const char* ssid     =    "iouti_net";
+    const char* password =    "thenightmareofhackers";
+    const char* raspip =      "192.168.5.1";
+//    const char* ssid     =    "Aquaris X5 Plus";
+//    const char* password =    "3cdb401cb5d6";
+//    const char* raspip =      "192.168.43.81";
+>>>>>>> 5ef81fad5bf75e862cbf2a5e818c4eb9ac6180f8
     const int port = 8080;
 
 
@@ -75,6 +84,8 @@
     const int VOLUME            = 1;
     const int WAITRESPONSE      = 2;
     const int AUDIO             = 3;
+
+    //These must be readed using stateSemaphore
     volatile int state_env      = IDLE;
     volatile boolean raspiListening=    true;
 
@@ -90,17 +101,12 @@
 
 
 //TASK HANDLES DEFINITIONS
-
     TaskHandle_t Beacons;
     TaskHandle_t MicroInput;
     TaskHandle_t taskFFT;
     TaskHandle_t Enviar;
     TaskHandle_t esp32Server;
     TaskHandle_t esp32Client;
-
-//HARDWARE INIT
-
-
 
 
 void codeForBeacons( void * parameter){
@@ -525,46 +531,51 @@ void codeForClient( void * parameter){
     while(true){
         vTaskSuspend(esp32Client);
         client.stop();
-        vTaskDelay(1000);
         //if there's a successful connection:
         if (client.connect(raspip, port)) {
             Serial.println("connecting...");
             // send the HTTP request:
-            vTaskDelay(100);
             //Send information
             Serial.println("Information to send");
-            switch (state_env) {
-                case VOLUME:
-                    client.println(makeHTTPrequest("POST","/volume","application/json",data, localitzationDelta ,EndOfFile));
-                    if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
-                    {
-                            // We were able to obtain the semaphore and can now access the
-                            // shared resource.
-                            state_env=WAITRESPONSE;
-                            // We have finished accessing the shared resource.  Release the
-                            // semaphore.
-                            xSemaphoreGive( stateSemaphore );
-                    }
-                    break;
-                case WAITRESPONSE:
-                    client.println(makeHTTPrequest("POST","/audio","application/json",data , localitzationDelta, EndOfFile));
-                    if(EndOfFile==true){
+            if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
+            {
+                // We were able to obtain the semaphore and can now access the
+                // shared resource.
+                switch (state_env) {
+                    case VOLUME:
+                        client.println(makeHTTPrequest("POST","/volume","application/json",data, localitzationDelta ,EndOfFile));
                         if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
+                        {
+                            state_env=WAITRESPONSE;
+                        }
+                    break;
+                    case AUDIO:
+                        client.println(makeHTTPrequest("POST","/audio","application/json",data , localitzationDelta, EndOfFile));
+                        if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
                         {
                             // We were able to obtain the semaphore and can now access the
                             // shared resource.
-                            state_env=IDLE;
+                            if(EndOfFile==true){
+                                EndOfFile=false;
+                                //Go back to initial state
+                                state_env=IDLE;
+                                raspiListening=true;
+                            }
                             // We have finished accessing the shared resource.  Release the
                             // semaphore.
-                            xSemaphoreGive( stateSemaphore );
+                            xSemaphoreGive( dataSemaphore );
                         }
+                    break;
+                    default:
+                        client.println(makeHTTPrequest("POST","/error","application/json",data , localitzationDelta, EndOfFile));
+                    break;
                     }
-                    break;
-                default:
-                    client.println(makeHTTPrequest("POST","/error","application/json",data , localitzationDelta, EndOfFile));
-                    break;
+                Serial.println("Post end");
+                // We have finished accessing the shared resource.  Release the
+                // semaphore.
+                xSemaphoreGive( stateSemaphore );
             }
-            Serial.println("Post end");
+
         }else{
             // if you couldn't make a connection:
             Serial.println("connection failed");
