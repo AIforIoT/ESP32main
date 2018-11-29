@@ -7,12 +7,12 @@
 //WIFI DEFINITIONS
 
     int status = WL_IDLE_STATUS;
-    const char* ssid     =    "iouti_net";
-    const char* password =    "thenightmareofhackers";
-    const char* raspip =      "192.168.5.1";
-//    const char* ssid     =    "Aquaris X5 Plus";
-//    const char* password =    "3cdb401cb5d6";
-//    const char* raspip =      "192.168.43.81";
+//    const char* ssid     =    "iouti_net";
+//    const char* password =    "thenightmareofhackers";
+//    const char* raspip =      "192.168.5.1";
+    const char* ssid     =    "Aquaris X5 Plus";
+    const char* password =    "3cdb401cb5d6";
+    const char* raspip =      "192.168.43.81";
     const int port = 8080;
 
 
@@ -102,8 +102,9 @@ void codeForBeacons( void * parameter){
     //Code goes here
     Serial.begin(115200);
     while(true){
-        //Serial.println("Print from core 1,Beacon task test");
-        vTaskDelay(500);
+        Serial.println("Print from core 1,Beacon task test");
+        delay(100);
+        vTaskDelay(500/portTICK_PERIOD_MS);
     }
 }
 
@@ -296,10 +297,11 @@ void codeForServer( void * parameter){
         if (client) {
             Serial.println("new client");
             String currentLine = "";                // make a String to hold incoming data from the client
+            
             while (client.connected()) {            // loop while the client's connected
                 if (client.available()) {             // if there's bytes to read from the client,
                   c = client.read();             // read a byte, then
-                  Serial.write(c);                    // print it out the serial monitor
+                  //Serial.write(c);                    // print it out the serial monitor
                 }
                 //This ESP32 server only expects HTTP Request:
                 // GET /H HTTP/1.x
@@ -313,6 +315,8 @@ void codeForServer( void * parameter){
                         client.println();
                         //Serial.println("H request detected");
                         client.stop();
+                        currentLine="";
+                        break;
 
                     }else if (currentLine.endsWith("GET /L ")) {
                         digitalWrite(33, LOW);                // GET /L turns the RELAY off
@@ -320,6 +324,8 @@ void codeForServer( void * parameter){
                         client.println();
                         Serial.println("L request detected");
                         client.stop();
+                        currentLine="";
+                        break;
 
 
                     }else if (currentLine.endsWith("GET /data/on ")) {
@@ -337,6 +343,8 @@ void codeForServer( void * parameter){
                         }
                         Serial.print("DATAON");
                         client.stop();
+                        currentLine="";
+                        break;
 
                      }else if (currentLine.endsWith("GET /data/off ")) {
                         // AUDIO DATA NOT REQUESTED FROM RASPI
@@ -354,6 +362,8 @@ void codeForServer( void * parameter){
                         }
                         Serial.print("DATAOFF");
                         client.stop();
+                        currentLine="";
+                        break;
 
                     }else if (currentLine.endsWith("GET /volume ")) {
                         // VOLUME REQUEST FROM RASPI
@@ -370,7 +380,9 @@ void codeForServer( void * parameter){
                             xSemaphoreGive( stateSemaphore );
                         }
                         client.stop();
+                        currentLine="";
                         Serial.print("VOLUME");
+                        break;
                     }
 
                 }else{  //End of first request line , no accepted get requested
@@ -378,6 +390,8 @@ void codeForServer( void * parameter){
                     client.println("HTTP/1.1 405 Method Not Allowed");
                     client.println();
                     client.stop();
+                    currentLine="";
+                    break;
                 }
             }
             // close the connection:
@@ -455,7 +469,6 @@ void codeForClient( void * parameter){
     }
 }//END code for client
 
-
 //Start execution
 void setup(){
     pinMode(33, OUTPUT);       // set the RELAY pin mode
@@ -481,14 +494,14 @@ void setup(){
     delay(1000);
     digitalWrite(32, LOW);
     delay(1000);
-//    xTaskCreatePinnedToCore(
-//        codeForBeacons,             //Task function
-//        "Beacons",                  //name of task
-//        1000,                       //Stack size of the task
-//        NULL,                       //parameter of the task
-//        1,                          //priority of the task
-//        &Beacons,                   //Task handle to keep track of created task
-//        1);                         //core
+    xTaskCreatePinnedToCore(
+        codeForBeacons,             //Task function
+        "Beacons",                  //name of task
+        1000,                       //Stack size of the task
+        NULL,                       //parameter of the task
+        1,                          //priority of the task
+        &Beacons,                   //Task handle to keep track of created task
+        1);                         //core
 
     xTaskCreatePinnedToCore(
         codeForMicroInput,          //Task function
