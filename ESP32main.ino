@@ -7,21 +7,12 @@
 //WIFI DEFINITIONS
 
     int status = WL_IDLE_STATUS;
-<<<<<<< HEAD
-//    const char* ssid     =    "iouti_net";
-//    const char* password =    "thenightmareofhackers";
-//    const char* raspip =      "192.168.5.1";
-    const char* ssid     =    "Aquaris X5 Plus";
-    const char* password =    "3cdb401cb5d6";
-    const char* raspip =      "192.168.43.81";
-=======
-    const char* ssid     =    "iouti_net";
-    const char* password =    "thenightmareofhackers";
-    const char* raspip =      "192.168.5.1";
-//    const char* ssid     =    "Aquaris X5 Plus";
-//    const char* password =    "3cdb401cb5d6";
-//    const char* raspip =      "192.168.43.81";
->>>>>>> 5ef81fad5bf75e862cbf2a5e818c4eb9ac6180f8
+   const char* ssid     =    "iouti_net";
+   const char* password =    "thenightmareofhackers";
+   const char* raspip =      "192.168.5.1";
+    // const char* ssid     =    "Aquaris X5 Plus";
+    // const char* password =    "3cdb401cb5d6";
+    // const char* raspip =      "192.168.43.81";
     const int port = 8080;
 
 
@@ -134,7 +125,8 @@ void codeForMicroInput( void * parameter){
         //Serial.println("Proceso 2");
         wave[i] = analogRead(CHANNEL); // Lectura del valor del pin
        // Serial.println("---------------->>wave[" + (String)i + "] (" + (String)numTramaLectura +") = " + (String)wave[i]);
-        waveString += (String)wave[i]; //AMB COMA??
+        waveString += (String)wave[i];
+        waveString += ",";//AMB COMA??
 
        // long t0 = micros();
 //        while(micros() - microsecondsLectura < sampling_period_us){ //Espera a que haya pasado un periodo de muestreo
@@ -143,14 +135,14 @@ void codeForMicroInput( void * parameter){
 
          //delayMicroseconds(63);
         //long t1 = micros();
-        
+
      }
 
       for(int i=0; i<Nwave; i++){
 
           waveForFFT[i] = wave[i];
       }
-     
+
 
      if (!concat){
      //Guardar tramas anteriores
@@ -166,9 +158,9 @@ void codeForMicroInput( void * parameter){
       numTramasGuardadas++;
      }
 
-    
 
-   
+
+
         tramaNueva = 1;
         calcularFFT = !calcularFFT;
 
@@ -176,30 +168,31 @@ void codeForMicroInput( void * parameter){
 
         if(tramaNueva == 1 && calcularFFT == 1){
           vTaskResume(taskFFT);
-          
+
         }
-        
-        
-    
+
+
+
     //Serial.println("------------------------------>>>>>>Resume calcularFFT: " + (String)calcularFFT +"    "+ (String)tramaNueva);
     //vTaskResume(taskFFT);
-    
+
 
     //long t2 = micros() - microsecondsLectura;
     //long fm = 1000000*Nwave/t2;
-    
+
   }
 }
 
 void computeFFT(void *parameter){
 
    int localState;
+   int localRaspiListening;
 //   boolean localTramaNueva;
 //   boolean localCalcularFFT;
 
    Serial.println("------------------->> Entra FFT");
 
-   
+
 
   while(true){
 
@@ -219,7 +212,7 @@ void computeFFT(void *parameter){
 //    //empty loop
 //   Serial.println("----------------Esperando " + (String)calcularFFT +"   "+ (String)tramaNueva);
 //   }
-    
+
     numTramaFFT = numTramaFFT + 2;
     microsecondsFFT = micros();
 
@@ -269,15 +262,27 @@ void computeFFT(void *parameter){
         // We were able to obtain the semaphore and can now access the
         // shared resource.
         localState = state_env;
+        localRaspiListening = raspiListening;
         // We have finished accessing the shared resource.  Release the
         // semaphore.
         xSemaphoreGive( stateSemaphore );
     }
 
-    if(localState == IDLE && isVoice == 1){
+    if(localState == IDLE && isVoice == 1 && localRaspiListening==1 ){
+            
+            if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
+        {
+            // We were able to obtain the semaphore and can now access the
+            // shared resource.
+            state_env = VOLUME;
+            
+            // We have finished accessing the shared resource.  Release the
+            // semaphore.
+            xSemaphoreGive( stateSemaphore );
+        }
     }
 
-    if(localState == VOLUME && isVoice == 1){
+    if(localState == VOLUME && isVoice == 1 && localRaspiListening){
       concat = 1;
 
       state_env = 1;
@@ -343,7 +348,7 @@ void computeFFT(void *parameter){
 
     long tiempo = micros() - microsecondsFFT;
    // tramaNueva = 0;
-   
+
     vTaskSuspend(taskFFT);
   }
 
@@ -682,10 +687,10 @@ void setup(){
 //DO NOTHING IN LOOP
 void loop(){
     // send it out the serial port.This is for debugging purposes only:
-//    while (client.available()) {
-//            char c = client.read();
-            //Serial.write(c);
-//    }
+    while (client.available()) {
+            char c = client.read();
+            Serial.write(c);
+    }
 //    while(true){
         //Serial.println(state_env);
 //    }
