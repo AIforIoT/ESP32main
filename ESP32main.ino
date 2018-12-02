@@ -18,15 +18,16 @@
 //    const char* ssid     =    "iouti_net";
 //    const char* password =    "thenightmareofhackers";
 //    const char* raspip =      "192.168.5.1";
-//    const char* ssid     =    "Aquaris X5 Plus";
-//    const char* password =    "3cdb401cb5d6";
+    const char* ssid     =    "Aquaris X5 Plus";
+    const char* password =    "3cdb401cb5d6";
 //    const char* raspip =      "192.168.43.81";
 //    const char* ssid     =    "AndroidAP";
 //    const char* password =    "wqzz8899";
 //    const char* raspip =      "192.168.1.143";
-    const char* ssid     =    "Celia";
-    const char* password =    "ww25i16axkg2e";
-    const char* raspip =      "172.20.10.4";
+//    const char* ssid     =    "Celia";
+//    const char* password =    "ww25i16axkg2e";
+    const char* raspip =      "192.168.43.14";
+    String esp_id="";
 
     const int port = 8080;
 
@@ -102,7 +103,7 @@
     SemaphoreHandle_t stateSemaphore = NULL;
     SemaphoreHandle_t fftSemaphore = NULL;
     String data = "";
-    int localitzationDelta=100;
+    int localitzationDelta=45;
     boolean EndOfFile;
 
 
@@ -205,7 +206,11 @@ void codeForMicroInput( void * parameter){
         savedAudio += waveString;
         Serial.println("Concatenando...");
         numTramasGuardadas++;
-        Serial.println(numTramasGuardadas);
+        
+       }
+
+       if(numTramasGuardadas >= 300){
+        concat = 0;
        }
   
    
@@ -285,8 +290,14 @@ void computeFFT(void *parameter){
         xSemaphoreGive( stateSemaphore );
     }
 
-    
-    if(localState == IDLE && isVoice == 1 && localRaspiListening == 1){
+    if(localState == IDLE && localRaspiListening == 0){
+      
+         noVoiceCounter = 0;
+        savedAudio= " ";
+        concat = 0;
+        numTramasGuardadas = 0;
+        
+    }else if(localState == IDLE && isVoice == 1 && localRaspiListening == 1){
           concat = 1;
 
       
@@ -322,6 +333,8 @@ void computeFFT(void *parameter){
     //Para de enviar cuando pasan 4 segundos de silencio o maximo 10 segundos de
 
     if(localState == AUDIO){
+      Serial.print("Num Trama: ");
+      Serial.println(numTramasGuardadas);
       
  /*     if( numTramasGuardadas == tramas1Segundo){ //Envia audio de 1 segundo cada vez
 
@@ -337,7 +350,7 @@ void computeFFT(void *parameter){
         Serial.println("enviando...");
       }else */
       
-      if((numTramasEnviadas >= tramas10Segundos || noVoiceCounter >= tramas4Segundos)){
+      if((numTramasGuardadas >= tramas10Segundos || noVoiceCounter >= tramas4Segundos)){
         
         if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
         {
@@ -348,6 +361,8 @@ void computeFFT(void *parameter){
             // semaphore.
             xSemaphoreGive( dataSemaphore );
         }
+
+        Serial.println(savedAudio);
 
         if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
         {
@@ -363,8 +378,9 @@ void computeFFT(void *parameter){
         Serial.println("Enviado");
         
         noVoiceCounter = 0;
+        savedAudio= " ";
         concat = 0;
-        numTramasEnviadas = 0;
+        numTramasGuardadas = 0;
       }
 
     }
@@ -503,14 +519,17 @@ void codeForClient( void * parameter){
                 // shared resource.
                 switch (state_env) {
                     case VOLUME:
-                        client.println(makeHTTPrequest("POST","/volume","application/json",data, localitzationDelta ,EndOfFile));
-                        if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
-                        {
-                            state_env=WAITRESPONSE;
-                        }
+                        client.println(makeHTTPrequest("POST","/volume","application/json",data, localitzationDelta ,EndOfFile,esp_id));
+                        Serial.println(makeHTTPrequest("POST","/volume","application/json",data, localitzationDelta ,EndOfFile,esp_id));
+                                             
+                        state_env=WAITRESPONSE;
+                        
                     break;
                     case AUDIO:
-                        client.println(makeHTTPrequest("POST","/audio","application/json",data , localitzationDelta, EndOfFile));
+                        client.println(makeHTTPrequest("POST","/audio","application/json",data , localitzationDelta, EndOfFile,esp_id));
+                        Serial.println(makeHTTPrequest("POST","/audio","application/json",data , localitzationDelta, EndOfFile,esp_id));
+
+                        
                         if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
                         {
                             // We were able to obtain the semaphore and can now access the
@@ -519,7 +538,7 @@ void codeForClient( void * parameter){
                                 EndOfFile=false;
                                 //Go back to initial state
                                 state_env=IDLE;
-                                raspiListening=true;
+                                raspiListening=false;
                             }
                             // We have finished accessing the shared resource.  Release the
                             // semaphore.
@@ -527,7 +546,7 @@ void codeForClient( void * parameter){
                         }
                     break;
                     default:
-                        client.println(makeHTTPrequest("POST","/error","application/json",data , localitzationDelta, EndOfFile));
+                        client.println(makeHTTPrequest("POST","/error","application/json",data , localitzationDelta, EndOfFile,esp_id));
                     break;
                     }
                 Serial.println("Post end");
@@ -577,6 +596,7 @@ void setup(){
         delay(2000);
     }
     Serial.println("Connected");
+    esp_id=WiFi.localIP().toString();
     digitalWrite(33, HIGH);
     delay(1000);
     digitalWrite(33, LOW);
@@ -645,12 +665,12 @@ void loop(){
 //    while(true){
         //Serial.println(state_env);
 //    }
-    vTaskDelay(5000);
-    Serial.println(state_env);
+    vTaskDelay(1000);
+    Serial.println("----------------------------------->" + (String)state_env);
 }
 
 //Auxiliary functions
-String makeHTTPrequest(String method, String uri, String type, String data, int localitzationDelta, boolean EndOfFile){
+String makeHTTPrequest(String method, String uri, String type, String data, int localitzationDelta, boolean EndOfFile, String esp_id){
     Serial.print("POST REQUESTSEND");
     String dataToSend = "";
     String localitzationToSend="";
@@ -668,18 +688,36 @@ String makeHTTPrequest(String method, String uri, String type, String data, int 
         // semaphore.
         xSemaphoreGive( dataSemaphore );
     }
-    postBody=postBody+
-    "{\n"
-    " \"EOF\": \""+EOFtoSend+"\",\n"
-    " \"location\": \""+ localitzationToSend +"\",\n"
-    " \"data\": \""+dataToSend+"\"\n"
-    "}\n";
-
+    if(uri=="/audio"){
+        postBody=postBody+
+        "{\n"
+        " \"esp_id\": \""+esp_id+"\",\n"
+        " \"EOF\": \""+EOFtoSend+"\",\n"
+        " \"location\": \""+ localitzationToSend +"\",\n"
+        " \"data\": \""+dataToSend+"\"\n"
+        "}\n";
+//        postBody=postBody+
+//        "{\n"+
+//        " \"esp_id\": \""+esp_id+"\",\n"+
+//        " \"timestamp\": \""+ localitzationToSend +"\",\n"+
+//        " \"delay\": \""+ localitzationToSend +"\",\n"+
+//        " \"volume\": \""+dataToSend+"\"\n"+
+//        "}\n";
+    }else{
+        postBody=postBody+
+        "{\n"+
+        " \"esp_id\": \""+esp_id+"\",\n"+
+        " \"timestamp\": \""+ localitzationToSend +"\",\n"+
+        " \"delay\": \""+ localitzationToSend +"\",\n"+
+        " \"volume\": \""+dataToSend+"\"\n"+
+        "}\n";
+    }
+    
     String postHeader=
-    method+" "+uri+" HTTP/1.0\n"
+    method+" "+uri+" HTTP/1.1\n"
     "content-type: "+type+"\n"
     "content-Length: "+postBody.length()+"\n\n";
-
+  
     return postHeader+postBody;
 }
 double computeVolume(double *wave){
