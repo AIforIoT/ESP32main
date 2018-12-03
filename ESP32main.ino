@@ -253,18 +253,18 @@ void codeForMicroInput( void * parameter){
 
 
      if (!concat){
-     //Guardar tramas anteriores
-      waveAntS2 = waveAntS;
-      waveAntS = waveString;
-      savedAudio = waveAntS2 + waveAntS + waveString;
-      numTramasGuardadas = 3;
+        //Guardar tramas anteriores
+        waveAntS2 = waveAntS;
+        waveAntS = waveString;
+        savedAudio = waveAntS2 + waveAntS + waveString;
+        numTramasGuardadas = 3;
 
-     }else{
-     //Concantenar el audio que vas recibiendo
-      savedAudio += waveString;
-      //Serial.println("Concatenando...");
-      numTramasGuardadas++;
-     }
+    }else{
+        //Concantenar el audio que vas recibiendo
+        savedAudio += waveString;
+        //Serial.println("Concatenando...");
+        numTramasGuardadas++;
+    }
 
 
 
@@ -718,30 +718,41 @@ void setup(){
                     int lastIndex=postBody.indexOf("&");
                     ssid=postBody.substring(postBody.indexOf("=")+1,lastIndex);
                     ssid.replace('+',' ');
+                    Serial.println(ssid);
                     //Parse PASS
                     int initIndex=postBody.indexOf("=",lastIndex);
                     lastIndex=postBody.indexOf("&",lastIndex+1);
                     password=postBody.substring(initIndex+1,lastIndex);
+                    Serial.println(password);
                     //Parse TYPE
                     initIndex=postBody.indexOf("=",lastIndex);
                     lastIndex=postBody.indexOf("&",lastIndex+1);
                     type=postBody.substring(initIndex+1,lastIndex);
+                    Serial.println(type);
                     //Parse RASPIP
                     initIndex=postBody.indexOf("=",lastIndex);
                     lastIndex=postBody.indexOf("&",lastIndex+1);
                     raspip=postBody.substring(initIndex+1,lastIndex);
+                    Serial.println(raspip);
                     //Parse xPos
                     initIndex=postBody.indexOf("=",lastIndex);
                     lastIndex=postBody.indexOf("&",lastIndex+1);
                     xPos=postBody.substring(initIndex+1,lastIndex);
+                    Serial.println(xPos);
                     //Parse yPos
                     initIndex=postBody.indexOf("=",lastIndex);
-                    yPos=postBody.substring(initIndex+1);
+                    lastIndex=postBody.indexOf("&",lastIndex+1);
+                    yPos=postBody.substring(initIndex+1,lastIndex);
+                    Serial.println(yPos);
+                    //Parse side
+                    initIndex=postBody.indexOf("=",lastIndex);
+                    lastIndex=postBody.indexOf("&",lastIndex+1);
+                    side=postBody.substring(initIndex+1,lastIndex);
+                    Serial.println(side);
                     //Parse location
                     initIndex=postBody.indexOf("=",lastIndex);
-                    side=postBody.substring(initIndex+1);
-                    initIndex=postBody.indexOf("=",lastIndex);
                     location=postBody.substring(initIndex+1);
+                    Serial.println(location);
                     requestDetected=NONE;
                     currentLine="";
                     client.stop();
@@ -795,19 +806,27 @@ void setup(){
         //if there's a successful connection:
         if (client.connect(raspip.c_str(), 8080)) {
             Serial.println("connecting...");
+
             // send the HTTP GET request:
-            client.println("POST /setUp HTTP/1.1");
-            client.println("content-type: application/json");
-            client.println("");
-            client.println("\"esp_id\": \""+esp_ip+"\",");
-            client.println("\"esp_ip\": \""+esp_ip+"\",");
-            client.println("\"esp_type\": \""+type+"\",");
-            client.println("\"esp_x_axis\": \""+xPos+"\",");
-            client.println("\"esp_y_axis\": \""+yPos+"\"");
-            client.println("\"side\": \""+side+"\",");
-            client.println("\"location\": \""+location+"\",");
-            client.println("");
+            String dataToSend = "POST /setUp HTTP/1.1\n"
+                                "content-type: application/json\n"
+                                "\n"
+                                "{\n"
+                                "\"esp_id\": \""+esp_ip+"\",\n"
+                                "\"esp_ip\": \""+esp_ip+"\",\n"
+                                "\"esp_type\": \""+type+"\",\n"
+                                "\"esp_x_axis\": \""+xPos+"\",\n"
+                                "\"esp_y_axis\": \""+yPos+"\",\n"
+                                "\"esp_y_axis\": \""+yPos+"\",\n"
+                                "\"side\": \""+side+"\",\n"
+                                "\"location\": \""+location+"\",\n"
+                                "}\n"
+                                "\n";
+
+            client.println(dataToSend);
+            Serial.println(dataToSend);
             Serial.println("Handshake sent, wainting for confirmation...");
+
             // listen for incoming clients
             server.begin();
             WiFiClient raspi = server.available();
@@ -825,7 +844,7 @@ void setup(){
                     while (raspi.connected()) {            // loop while the client's connected
                         if (raspi.available()) {             // if there's bytes to read from the client,
                             c = raspi.read();             // read a byte, then
-                            Serial.println(
+                            Serial.println(c);
                         }
                         //This ESP32 server only expects HTTP Request:
                         // GET 200 HTTP/1.x
