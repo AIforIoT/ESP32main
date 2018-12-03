@@ -7,13 +7,13 @@
 //WIFI DEFINITIONS
 
     int status = WL_IDLE_STATUS;
-<<<<<<< HEAD
 //    const char* ssid     =    "iouti_net";
 //    const char* password =    "thenightmareofhackers";
 //    const char* raspip =      "192.168.5.1";
 //    const char* ssid     =    "Aquaris X5 Plus";
 //    const char* password =    "3cdb401cb5d6";
 //    const char* raspip =      "192.168.43.81";
+
     const String HTMLPage=""
     "<!DOCTYPE html>\n"
     "<html>\n"
@@ -120,26 +120,6 @@
     const int NONE=0;
     const int GET=1;
     const int POST=2;
-=======
-<<<<<<< HEAD
-   const char* ssid     =    "iouti_net";
-   const char* password =    "thenightmareofhackers";
-   const char* raspip =      "192.168.5.1";
-    // const char* ssid     =    "Aquaris X5 Plus";
-    // const char* password =    "3cdb401cb5d6";
-    // const char* raspip =      "192.168.43.81";
-=======
-
-//    const char* ssid     =    "iouti_net";
-//    const char* password =    "thenightmareofhackers";
-//    const char* raspip =      "192.168.5.1";
-    const char* ssid     =    "Aquaris X5 Plus";
-    const char* password =    "3cdb401cb5d6";
-    const char* raspip =      "192.168.43.81";
-
-
->>>>>>> 6a578bfd7a8102d2fab8dd05a2de584ac78cc5f9
->>>>>>> f54f57166b28d852e5ecd51ef2d6a034268a30c1
     const int port = 8080;
     String ssid     = "";
     String password = "";
@@ -343,9 +323,6 @@ void computeFFT(void *parameter){
         noVoiceCounter = 0;
         volumen = computeVolume(tramaFFT);
         Serial.println(x);
-
-
-
     }else{
       Serial.println("Otra cosa");
       Serial.println(x);
@@ -448,7 +425,6 @@ void computeFFT(void *parameter){
 
 }
 
-
 void codeForServer( void * parameter){
 
     server.begin();
@@ -514,7 +490,7 @@ void codeForServer( void * parameter){
                         currentLine="";
                         break;
 
-                     }else if (currentLine.endsWith("GET /data/off ")) {
+                    }else if (currentLine.endsWith("GET /data/off ")) {
                         // AUDIO DATA NOT REQUESTED FROM RASPI
                         client.println("HTTP/1.1 200 OK");
                         client.println();
@@ -586,14 +562,11 @@ void codeForClient( void * parameter){
                 // shared resource.
                 switch (state_env) {
                     case VOLUME:
-                        client.println(makeHTTPrequest("POST","/volume","application/json",data, localitzationDelta ,EndOfFile));
-                        if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
-                        {
-                            state_env=WAITRESPONSE;
-                        }
+                        client.println(makeHTTPrequest("POST","/volume","application/json",data, localitzationDelta ,EndOfFile, esp_ip));
+                        state_env=WAITRESPONSE;
                     break;
                     case AUDIO:
-                        client.println(makeHTTPrequest("POST","/audio","application/json",data , localitzationDelta, EndOfFile));
+                        client.println(makeHTTPrequest("POST","/audio","application/json",data , localitzationDelta, EndOfFile, esp_ip));
                         if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
                         {
                             // We were able to obtain the semaphore and can now access the
@@ -610,7 +583,9 @@ void codeForClient( void * parameter){
                         }
                     break;
                     default:
-                        client.println(makeHTTPrequest("POST","/error","application/json",data , localitzationDelta, EndOfFile));
+                        client.println(makeHTTPrequest("POST","/error","application/json",data , localitzationDelta, EndOfFile, esp_ip));
+                        state_env=IDLE;
+                        raspiListening=false;
                     break;
                     }
                 Serial.println("Post end");
@@ -618,7 +593,6 @@ void codeForClient( void * parameter){
                 // semaphore.
                 xSemaphoreGive( stateSemaphore );
             }
-
         }else{
             // if you couldn't make a connection:
             Serial.println("connection failed");
@@ -659,6 +633,7 @@ void setup(){
         Serial.println(WiFi.softAPIP());
         server.begin();
         boolean flag=false;
+        boolean loginERROR=false;
         boolean whileExit=false;
         String postBody="";                     //Make a String to save post body data
         int contentLenght=0;
@@ -793,7 +768,6 @@ void setup(){
                         Serial.println(ssid);
                         Serial.println("FATAL ERROR: RESTARTING ESP32 CONFIG");
                     }
-
                 }//END of POST
                 if (requestDetected==GET) {
                     // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
@@ -822,8 +796,8 @@ void setup(){
         if (client.connect(raspip.c_str(), 8080)) {
             Serial.println("connecting...");
             // send the HTTP GET request:
-            client.println("POST /espData/SetUp HTTP/1.0");
-            client.println("content-type: tex/plain");
+            client.println("POST /setUp HTTP/1.1");
+            client.println("content-type: application/json");
             client.println("");
             client.println("\"esp_id\": \""+esp_ip+"\",");
             client.println("\"esp_ip\": \""+esp_ip+"\",");
@@ -833,11 +807,67 @@ void setup(){
             client.println("\"side\": \""+side+"\",");
             client.println("\"location\": \""+location+"\",");
             client.println("");
-            break; //EXIT LOGIN WHILE
+            Serial.println("Handshake sent, wainting for confirmation...");
+            // listen for incoming clients
+            server.begin();
+            WiFiClient raspi = server.available();
+            Serial.println("Server started");
+            Serial.print("Server is at ");
+            Serial.println(WiFi.localIP());
+            whileExit=false;
+            char c;
+            while(true)
+            {
+                if (raspi) {
+                    Serial.println("new client");
+                    String currentLine = "";                // make a String to hold incoming data from the client
+
+                    while (raspi.connected()) {            // loop while the client's connected
+                        if (raspi.available()) {             // if there's bytes to read from the client,
+                            c = raspi.read();             // read a byte, then
+                            Serial.println(
+                        }
+                        //This ESP32 server only expects HTTP Request:
+                        // GET 200 HTTP/1.x
+                        // GET 500 HTTP/1.x
+                        if (c != '\r') {  // if you got anything else but a carriage return character,
+                            currentLine += c;      // add it to the end of the currentLine
+                            // Check to see if the client request was "GET /H" or "GET /L":
+                            if (currentLine.endsWith("GET 200")) {
+                                raspi.println("HTTP/1.1 200 OK");
+                                raspi.println();
+                                raspi.stop();
+                                currentLine="";
+                                whileExit=true;
+                                break;
+
+                            }else if (currentLine.endsWith("GET 500 ")) {
+                                raspi.println("HTTP/1.1 200 OK");
+                                raspi.println();
+                                Serial.println("FATAL ERROR: Unable to handshake with Raspberry Pi.");
+                                Serial.println("RESTARTING ESP32 CONFIG");
+                                raspi.stop();
+                                currentLine="";
+                                loginERROR=true;
+                                whileExit=true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if(whileExit==true)
+                {
+                    break;
+                }
+            }
         }else{
             // if you couldn't make a connection:
             Serial.println("FATAL ERROR: Unable to handshake with Raspberry Pi.");
             Serial.println("RESTARTING ESP32 CONFIG");
+            loginERROR=true;
+        }
+        if(loginERROR==false){
+            break; //EXIT LOGIN WHILE
         }
     }//END OF LOGIN WHILE
 
@@ -901,25 +931,16 @@ void setup(){
         &esp32Client,               //Task handle to keep track of created task
         1);                         //core
 
-    vTaskSuspend(Enviar);
-
 }
 //DO NOTHING IN LOOP
 void loop(){
     // send it out the serial port.This is for debugging purposes only:
-    while (client.available()) {
-            char c = client.read();
-            Serial.write(c);
-    }
-//    while(true){
-        //Serial.println(state_env);
-//    }
     vTaskDelay(5000);
     Serial.println(state_env);
 }
 
 //Auxiliary functions
-String makeHTTPrequest(String method, String uri, String type, String data, int localitzationDelta, boolean EndOfFile){
+String makeHTTPrequest(String method, String uri, String type, String data, int localitzationDelta, boolean EndOfFile, String esp_ip){
     Serial.print("POST REQUESTSEND");
     String dataToSend = "";
     String localitzationToSend="";
@@ -937,8 +958,10 @@ String makeHTTPrequest(String method, String uri, String type, String data, int 
         // semaphore.
         xSemaphoreGive( dataSemaphore );
     }
+    if(uri=="/volume")
     postBody=postBody+
     "{\n"
+    "\"esp_id\": \""+esp_ip+"\",\n"
     " \"EOF\": \""+EOFtoSend+"\",\n"
     " \"location\": \""+ localitzationToSend +"\",\n"
     " \"data\": \""+dataToSend+"\"\n"
