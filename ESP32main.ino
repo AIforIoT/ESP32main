@@ -29,6 +29,9 @@
     const char* raspip =      "192.168.43.14";
     String esp_id="";
 
+// Synch beacon timint
+    const unsigned long lastBeacon;
+
     const int port = 8080;
 
 
@@ -486,8 +489,21 @@ void codeForServer( void * parameter){
                         }
                         client.stop();
                         Serial.print("VOLUME");
+                    }else if (currentLine.endsWith("GET /sync ")) {
+                        // VOLUME REQUEST FROM RASPI
+                        client.println("HTTP/1.1 200 OK");
+                        client.println();
+                        Serial.println("Sync in action");
+                        if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
+                        {
+                            setLastBeacon(micros());
+                            // We have finished accessing the shared resource.  Release the
+                            // semaphore.
+                            xSemaphoreGive( dataSemaphore );
+                        }
+                        client.stop();
+                        Serial.print("SYNC");
                     }
-
                 }else{  //End of first request line , no accepted get requested
                     //Error 405 Method Not Allowed
                     client.println("HTTP/1.1 405 Method Not Allowed");
@@ -731,4 +747,17 @@ double computeVolume(double *wave){
     
     return pot;
 
+}
+
+void setLastBeacon(unsigned long time){
+    lastBeacon = time;
+}
+
+unsigned long getLastBeacon(){
+    return lastBeacon;   
+}
+
+unsigned long getDelay(unsigned long currTime){
+    unsigned long delay = currTime-getLastBeacon();
+    return delay;
 }
