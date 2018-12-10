@@ -800,7 +800,7 @@ void setup(){
                     Serial.println("Client Disconnected.");
                 }//END of GET
             }//END if client
-        }//END WHILE
+        }//END WEB PAGE SERVER WHILE
 
         //Connected to system WIFI, begin RASPI handshke:
         //if there's a successful connection:
@@ -808,10 +808,7 @@ void setup(){
             Serial.println("connecting...");
 
             // send the HTTP GET request:
-            String dataToSend = "POST /setUp HTTP/1.1\n"
-                                "content-type: application/json\n"
-                                "\n"
-                                "{\n"
+            String dataToSend = "{\n"
                                 "\"esp_id\": \""+esp_ip+"\",\n"
                                 "\"esp_ip\": \""+esp_ip+"\",\n"
                                 "\"esp_type\": \""+type+"\",\n"
@@ -819,24 +816,30 @@ void setup(){
                                 "\"esp_y_axis\": \""+yPos+"\",\n"
                                 "\"esp_y_axis\": \""+yPos+"\",\n"
                                 "\"side\": \""+side+"\",\n"
-                                "\"location\": \""+location+"\",\n"
+                                "\"location\": \""+location+"\"\n"
                                 "}\n"
                                 "\n";
 
-            client.println(dataToSend);
-            Serial.println(dataToSend);
+            String header = "POST /setUp HTTP/1.1\n"
+                            "content-type: application/json\n"
+                            "content-Length: "+ String(dataToSend.length())+"\n\n";
+
+
+            client.println(header+dataToSend);
+            Serial.println(header+dataToSend);
             Serial.println("Handshake sent, wainting for confirmation...");
 
             // listen for incoming clients
             server.begin();
-            WiFiClient raspi = server.available();
             Serial.println("Server started");
             Serial.print("Server is at ");
             Serial.println(WiFi.localIP());
+            delay(1000);
             whileExit=false;
             char c;
             while(true)
             {
+                WiFiClient raspi = server.available();
                 if (raspi) {
                     Serial.println("new client");
                     String currentLine = "";                // make a String to hold incoming data from the client
@@ -844,15 +847,13 @@ void setup(){
                     while (raspi.connected()) {            // loop while the client's connected
                         if (raspi.available()) {             // if there's bytes to read from the client,
                             c = raspi.read();             // read a byte, then
-                            Serial.println(c);
+                            Serial.print(c);
                         }
                         //This ESP32 server only expects HTTP Request:
-                        // GET 200 HTTP/1.x
-                        // GET 500 HTTP/1.x
+
                         if (c != '\r') {  // if you got anything else but a carriage return character,
                             currentLine += c;      // add it to the end of the currentLine
-                            // Check to see if the client request was "GET /H" or "GET /L":
-                            if (currentLine.endsWith("GET 200")) {
+                            if (currentLine.endsWith("200")) {
                                 raspi.println("HTTP/1.1 200 OK");
                                 raspi.println();
                                 raspi.stop();
@@ -860,16 +861,24 @@ void setup(){
                                 whileExit=true;
                                 break;
 
-                            }else if (currentLine.endsWith("GET 500 ")) {
+                            }else if (currentLine.endsWith("500")) {
                                 raspi.println("HTTP/1.1 200 OK");
                                 raspi.println();
                                 Serial.println("FATAL ERROR: Unable to handshake with Raspberry Pi.");
                                 Serial.println("RESTARTING ESP32 CONFIG");
+                                raspi.println(header+dataToSend);
+                                Serial.println(header+dataToSend);
                                 raspi.stop();
                                 currentLine="";
-                                loginERROR=true;
-                                whileExit=true;
-                                break;
+                            }else{
+                                raspi.println("HTTP/1.1 401");
+                                Serial.println("Unknown petition");
+                                Serial.println("FATAL ERROR: Unable to handshake with Raspberry Pi.");
+                                Serial.println("RESTARTING ESP32 CONFIG");
+                                raspi.println(header+dataToSend);
+                                Serial.println(header+dataToSend);
+                                raspi.stop();
+                                currentLine="";
                             }
                         }
                     }
@@ -882,15 +891,17 @@ void setup(){
         }else{
             // if you couldn't make a connection:
             Serial.println("FATAL ERROR: Unable to handshake with Raspberry Pi.");
-            Serial.println("RESTARTING ESP32 CONFIG");
-            loginERROR=true;
+            Serial.println("RESTARTING WIFI ESP32 CONFIG");
         }
-        if(loginERROR==false){
-            break; //EXIT LOGIN WHILE
-        }
-    }//END OF LOGIN WHILE
 
-    Serial.println("Connected");
+    }//END OF LOGIN WHILE
+    Serial.println("SUCCES: Handshake completed");
+    Serial.println("*************************");
+    Serial.println("Connected to IOT SYSTEM !");
+    Serial.println("Project IOUTI");
+    Serial.println("PAE UPC 2018");
+    Serial.println("*************************");
+    Serial.println("INIT sequence start");
 
     //HARDWARE CHECK
     digitalWrite(33, HIGH);
