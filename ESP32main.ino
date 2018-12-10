@@ -18,11 +18,11 @@
 //    const char* ssid     =    "iouti_net";
 //    const char* password =    "thenightmareofhackers";
 //    const char* raspip =      "192.168.5.1";
-    const char* ssid     =    "Aquaris X5 Plus";
-    const char* password =    "3cdb401cb5d6";
+//    const char* ssid     =    "Aquaris X5 Plus";
+//    const char* password =    "3cdb401cb5d6";
 //    const char* raspip =      "192.168.43.81";
-//    const char* ssid     =    "AndroidAP";
-//    const char* password =    "wqzz8899";
+    const char* ssid     =    "AndroidAP";
+    const char* password =    "wqzz8899";
 //    const char* raspip =      "192.168.1.143";
 //    const char* ssid     =    "Celia";
 //    const char* password =    "ww25i16axkg2e";
