@@ -10,6 +10,8 @@
 #include "esp_system.h"
 #include <stdio.h>
 #include <stdint.h>
+#include "AsyncUDP.h"
+#include "esp32-hal-timer.h"
 
 //WIFI DEFINITIONS
 
@@ -192,6 +194,14 @@
     // Initialize the Wifi server library
     WiFiServer server(80);
 
+//UDP Server
+
+  AsyncUDP udp;
+
+
+//Timer isr
+
+  hw_timer_t *timer = NULL;
 
 //GLOBAL STATES DEFINITIONS
 
@@ -211,7 +221,7 @@
     SemaphoreHandle_t stateSemaphore = NULL;
     SemaphoreHandle_t fftSemaphore = NULL;
     String data = "";
-    int localitzationDelta=45;
+    //int localitzationDelta=45;
     boolean EndOfFile;
 
 
@@ -251,14 +261,60 @@
     };
 
 
+String uint64toString(uint64_t num){
+    uint32_t low = num % 0xFFFFFFFF; 
+    uint32_t high = (num >> 32) % 0xFFFFFFFF;
+    return String(low)+String(high);
+}
+void IRAM_ATTR onTimer(){
+  Serial.println("Missed N synchronizing frames... Problem there?");
+}
 void codeForBeacons( void * parameter){
-    //Code goes here
     Serial.begin(115200);
-    while(true){
-        Serial.println("Print from core 1,Beacon task test");
-        delay(100);
-        vTaskDelay(500/portTICK_PERIOD_MS);
+    if(udp.listen(IPAddress(0,0,0,0),9013)) {
+      Serial.print("UDP connected listenning on IP:");
+      Serial.print(WiFi.localIP());
+      Serial.println(WiFi.subnetMask());
+
+      udp.onPacket([](AsyncUDPPacket packet) {
+     
+        Serial.print("UDP Packet Type: ");
+        Serial.print(packet.isBroadcast()?"Broadcast":packet.isMulticast()?"Multicast":"Unicast");
+        Serial.print(", From: ");
+        Serial.print(packet.remoteIP());
+        Serial.print(":");
+        Serial.print(packet.remotePort());
+        Serial.print(", To: ");
+        Serial.print(packet.localIP());
+        Serial.print(":");
+        Serial.print(packet.localPort());
+        Serial.print(", Length: ");
+        Serial.print(packet.length());
+        Serial.print(", Data: ");
+        Serial.write(packet.data(), packet.length());
+        Serial.println();
+        //reply to the client
+        
+        if(packet.remoteIP().toString()==raspip){
+            Serial.print("Read from timer:");
+            uint64_t timer_count = getDelayLocalization();
+            uint32_t low = timer_count % 0xFFFFFFFF; 
+            uint32_t high = (timer_count >> 32) % 0xFFFFFFFF;
+            reinitializeTimer();
+            Serial.print(low); 
+            Serial.println(high);
+            packet.printf("Got %u bytes of data", packet.length());
+
+        }
+          
+      });
     }
+}
+uint64_t getDelayLocalization(){
+  return timerRead(timer);
+}
+void reinitializeTimer(){
+  timerWrite(timer, 0); //reset timer (feed watchdog)
 }
 
 void codeForMicroInput( void * parameter){
@@ -632,11 +688,11 @@ void codeForClient( void * parameter){
                 // shared resource.
                 switch (state_env) {
                     case VOLUME:
-                        client.println(makeHTTPrequest("POST","/volume","application/json",data, localitzationDelta ,EndOfFile, esp_ip));
+                        client.println(makeHTTPrequest("POST","/volume","application/json",data, getDelayLocalization() ,EndOfFile, esp_ip));
                         state_env=WAITRESPONSE;
                     break;
                     case AUDIO:
-                        client.println(makeHTTPrequest("POST","/audio","application/json",data , localitzationDelta, EndOfFile, esp_ip));
+                        client.println(makeHTTPrequest("POST","/audio","application/json",data , getDelayLocalization(), EndOfFile, esp_ip));
                         if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
                         {
                             // We were able to obtain the semaphore and can now access the
@@ -653,7 +709,7 @@ void codeForClient( void * parameter){
                         }
                     break;
                     default:
-                        client.println(makeHTTPrequest("POST","/error","application/json",data , localitzationDelta, EndOfFile, esp_ip));
+                        client.println(makeHTTPrequest("POST","/error","application/json",data , getDelayLocalization(), EndOfFile, esp_ip));
                         state_env=IDLE;
                         raspiListening=false;
                     break;
@@ -924,15 +980,14 @@ void setup(){
     digitalWrite(32, LOW);
     delay(1000);
 
+    timer = timerBegin(0, 80, true);
+    timerAttachInterrupt(timer, &onTimer, true);
+    timerAlarmWrite(timer, 5000000, true);
+    timerAlarmEnable(timer);
+    
+    codeForBeacons(NULL);
+
     //THREAD INIT
-    xTaskCreatePinnedToCore(
-        codeForBeacons,             //Task function
-        "Beacons",                  //name of task
-        1000,                       //Stack size of the task
-        NULL,                       //parameter of the task
-        1,                          //priority of the task
-        &Beacons,                   //Task handle to keep track of created task
-        1);                         //core
 
     xTaskCreatePinnedToCore(
         codeForMicroInput,          //Task function
@@ -988,7 +1043,7 @@ void loop(){
 }
 
 //Auxiliary functions
-String makeHTTPrequest(String method, String uri, String type, String data, int localitzationDelta, boolean EndOfFile, String esp_id){
+String makeHTTPrequest(String method, String uri, String type, String data, uint64_t localitzationDelta, boolean EndOfFile, String esp_id){
     Serial.print("POST REQUESTSEND");
     String dataToSend = "";
     String localitzationToSend="";
@@ -1000,7 +1055,7 @@ String makeHTTPrequest(String method, String uri, String type, String data, int 
         // shared resource.
         //We make a local copy
         dataToSend = data;
-        localitzationToSend = String(localitzationDelta);
+        localitzationToSend = uint64toString(localitzationDelta);
         EOFtoSend=EndOfFile;
         // We have finished accessing the shared resource.  Release the
         // semaphore.
