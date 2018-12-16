@@ -691,12 +691,12 @@ void codeForClient( void * parameter){
                         client.println(makeHTTPrequest("POST","/volume","application/json",data, getDelayLocalization() ,EndOfFile, esp_ip));
                         state_env=WAITRESPONSE;
                     break;
-                    case AUDIO:
-                        client.println(makeHTTPrequest("POST","/audio","application/json",data , getDelayLocalization(), EndOfFile, esp_ip));
+                    case AUDIO:                        
                         if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
                         {
                             // We were able to obtain the semaphore and can now access the
                             // shared resource.
+                            client.println(makeHTTPaudio(esp_ip,data,EndOfFile));
                             if(EndOfFile==true){
                                 EndOfFile=false;
                                 //Go back to initial state
