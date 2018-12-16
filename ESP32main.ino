@@ -262,7 +262,7 @@
 
 
 String uint64toString(uint64_t num){
-    uint32_t low = num % 0xFFFFFFFF; 
+    uint32_t low = num % 0xFFFFFFFF;
     uint32_t high = (num >> 32) % 0xFFFFFFFF;
     return String(low)+String(high);
 }
@@ -277,7 +277,7 @@ void codeForBeacons( void * parameter){
       Serial.println(WiFi.subnetMask());
 
       udp.onPacket([](AsyncUDPPacket packet) {
-     
+
         Serial.print("UDP Packet Type: ");
         Serial.print(packet.isBroadcast()?"Broadcast":packet.isMulticast()?"Multicast":"Unicast");
         Serial.print(", From: ");
@@ -294,19 +294,19 @@ void codeForBeacons( void * parameter){
         Serial.write(packet.data(), packet.length());
         Serial.println();
         //reply to the client
-        
+
         if(packet.remoteIP().toString()==raspip){
             Serial.print("Read from timer:");
             uint64_t timer_count = getDelayLocalization();
-            uint32_t low = timer_count % 0xFFFFFFFF; 
+            uint32_t low = timer_count % 0xFFFFFFFF;
             uint32_t high = (timer_count >> 32) % 0xFFFFFFFF;
             reinitializeTimer();
-            Serial.print(low); 
+            Serial.print(low);
             Serial.println(high);
             packet.printf("Got %u bytes of data", packet.length());
 
         }
-          
+
       });
     }
 }
@@ -984,7 +984,7 @@ void setup(){
     timerAttachInterrupt(timer, &onTimer, true);
     timerAlarmWrite(timer, 5000000, true);
     timerAlarmEnable(timer);
-    
+
     codeForBeacons(NULL);
 
     //THREAD INIT
@@ -1104,4 +1104,10 @@ double computeVolume(double *wave){
 
     return pot;
 
+}
+
+String makeHTTPaudio(String esp_ip, String postBody, boolean EndOfFile){    
+    String header="POST /audio/";
+    header=header+esp_ip+"/"+String(EndOfFile)+" HTTP/1.1\n"+"content-type: text/plain\n"+"content-Length: "+String(postBody.length())+"\n\n";
+    return header+postBody;
 }
