@@ -691,7 +691,7 @@ void codeForClient( void * parameter){
                         client.println(makeHTTPrequest("POST","/volume","application/json",data, getDelayLocalization() ,EndOfFile, esp_ip));
                         state_env=WAITRESPONSE;
                     break;
-                    case AUDIO:                        
+                    case AUDIO:
                         if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
                         {
                             // We were able to obtain the semaphore and can now access the
@@ -1043,7 +1043,7 @@ void loop(){
 }
 
 //Auxiliary functions
-String makeHTTPrequest(String method, String uri, String type, String data, uint64_t localitzationDelta, boolean EndOfFile){
+String makeHTTPrequest(String method, String uri, String type, String data, uint64_t localitzationDelta, boolean EndOfFile, String esp_ip){
     Serial.print("POST REQUESTSEND");
     String dataToSend = "";
     String localitzationToSend="";
@@ -1063,6 +1063,7 @@ String makeHTTPrequest(String method, String uri, String type, String data, uint
     }
     postBody=postBody+
     "{\n"
+    " \"esp_id\": \""+esp_ip+"\",\n"
     " \"EOF\": \""+EOFtoSend+"\",\n"
     " \"location\": \""+ localitzationToSend +"\",\n"
     " \"data\": \""+dataToSend+"\"\n"
