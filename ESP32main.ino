@@ -1043,7 +1043,7 @@ void loop(){
 }
 
 //Auxiliary functions
-String makeHTTPrequest(String method, String uri, String type, String data, uint64_t localitzationDelta, boolean EndOfFile, String esp_id){
+String makeHTTPrequest(String method, String uri, String type, String data, uint64_t localitzationDelta, boolean EndOfFile){
     Serial.print("POST REQUESTSEND");
     String dataToSend = "";
     String localitzationToSend="";
@@ -1054,37 +1054,19 @@ String makeHTTPrequest(String method, String uri, String type, String data, uint
         // We were able to obtain the semaphore and can now access the
         // shared resource.
         //We make a local copy
-        dataToSend = data;
+        dataToSend = data; //volume is a int value in state AUDIO.
         localitzationToSend = uint64toString(localitzationDelta);
         EOFtoSend=EndOfFile;
         // We have finished accessing the shared resource.  Release the
         // semaphore.
         xSemaphoreGive( dataSemaphore );
     }
-    if(uri=="/audio"){
-        postBody=postBody+
-        "{\n"
-        " \"esp_id\": \""+esp_id+"\",\n"
-        " \"EOF\": \""+EOFtoSend+"\",\n"
-        " \"location\": \""+ localitzationToSend +"\",\n"
-        " \"data\": \""+dataToSend+"\"\n"
-        "}\n";
-//        postBody=postBody+
-//        "{\n"+
-//        " \"esp_id\": \""+esp_id+"\",\n"+
-//        " \"timestamp\": \""+ localitzationToSend +"\",\n"+
-//        " \"delay\": \""+ localitzationToSend +"\",\n"+
-//        " \"volume\": \""+dataToSend+"\"\n"+
-//        "}\n";
-    }else{
-        postBody=postBody+
-        "{\n"+
-        " \"esp_id\": \""+esp_id+"\",\n"+
-        " \"timestamp\": \""+ localitzationToSend +"\",\n"+
-        " \"delay\": \""+ localitzationToSend +"\",\n"+
-        " \"volume\": \""+dataToSend+"\"\n"+
-        "}\n";
-    }
+    postBody=postBody+
+    "{\n"
+    " \"EOF\": \""+EOFtoSend+"\",\n"
+    " \"location\": \""+ localitzationToSend +"\",\n"
+    " \"data\": \""+dataToSend+"\"\n"
+    "}\n";
 
     String postHeader=
     method+" "+uri+" HTTP/1.1\n"
@@ -1093,6 +1075,7 @@ String makeHTTPrequest(String method, String uri, String type, String data, uint
 
     return postHeader+postBody;
 }
+
 double computeVolume(double *wave){
     double sumP = 0;
     double pot = 0;
@@ -1106,7 +1089,7 @@ double computeVolume(double *wave){
 
 }
 
-String makeHTTPaudio(String esp_ip, String postBody, boolean EndOfFile){    
+String makeHTTPaudio(String esp_ip, String postBody, boolean EndOfFile){
     String header="POST /audio/";
     header=header+esp_ip+"/"+String(EndOfFile)+" HTTP/1.1\n"+"content-type: text/plain\n"+"content-Length: "+String(postBody.length())+"\n\n";
     return header+postBody;
