@@ -262,7 +262,7 @@
 
 
 String uint64toString(uint64_t num){
-    uint32_t low = num % 0xFFFFFFFF; 
+    uint32_t low = num % 0xFFFFFFFF;
     uint32_t high = (num >> 32) % 0xFFFFFFFF;
     return String(low)+String(high);
 }
@@ -277,7 +277,7 @@ void codeForBeacons( void * parameter){
       Serial.println(WiFi.subnetMask());
 
       udp.onPacket([](AsyncUDPPacket packet) {
-     
+
         Serial.print("UDP Packet Type: ");
         Serial.print(packet.isBroadcast()?"Broadcast":packet.isMulticast()?"Multicast":"Unicast");
         Serial.print(", From: ");
@@ -294,19 +294,19 @@ void codeForBeacons( void * parameter){
         Serial.write(packet.data(), packet.length());
         Serial.println();
         //reply to the client
-        
+
         if(packet.remoteIP().toString()==raspip){
             Serial.print("Read from timer:");
             uint64_t timer_count = getDelayLocalization();
-            uint32_t low = timer_count % 0xFFFFFFFF; 
+            uint32_t low = timer_count % 0xFFFFFFFF;
             uint32_t high = (timer_count >> 32) % 0xFFFFFFFF;
             reinitializeTimer();
-            Serial.print(low); 
+            Serial.print(low);
             Serial.println(high);
             packet.printf("Got %u bytes of data", packet.length());
 
         }
-          
+
       });
     }
 }
@@ -692,11 +692,11 @@ void codeForClient( void * parameter){
                         state_env=WAITRESPONSE;
                     break;
                     case AUDIO:
-                        client.println(makeHTTPrequest("POST","/audio","application/json",data , getDelayLocalization(), EndOfFile, esp_ip));
                         if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
                         {
                             // We were able to obtain the semaphore and can now access the
                             // shared resource.
+                            client.println(makeHTTPaudio(esp_ip,data,EndOfFile));
                             if(EndOfFile==true){
                                 EndOfFile=false;
                                 //Go back to initial state
@@ -984,7 +984,7 @@ void setup(){
     timerAttachInterrupt(timer, &onTimer, true);
     timerAlarmWrite(timer, 5000000, true);
     timerAlarmEnable(timer);
-    
+
     codeForBeacons(NULL);
 
     //THREAD INIT
@@ -1043,7 +1043,7 @@ void loop(){
 }
 
 //Auxiliary functions
-String makeHTTPrequest(String method, String uri, String type, String data, uint64_t localitzationDelta, boolean EndOfFile, String esp_id){
+String makeHTTPrequest(String method, String uri, String type, String data, uint64_t localitzationDelta, boolean EndOfFile, String esp_ip){
     Serial.print("POST REQUESTSEND");
     String dataToSend = "";
     String localitzationToSend="";
@@ -1054,37 +1054,20 @@ String makeHTTPrequest(String method, String uri, String type, String data, uint
         // We were able to obtain the semaphore and can now access the
         // shared resource.
         //We make a local copy
-        dataToSend = data;
+        dataToSend = data; //volume is a int value in state AUDIO.
         localitzationToSend = uint64toString(localitzationDelta);
         EOFtoSend=EndOfFile;
         // We have finished accessing the shared resource.  Release the
         // semaphore.
         xSemaphoreGive( dataSemaphore );
     }
-    if(uri=="/audio"){
-        postBody=postBody+
-        "{\n"
-        " \"esp_id\": \""+esp_id+"\",\n"
-        " \"EOF\": \""+EOFtoSend+"\",\n"
-        " \"location\": \""+ localitzationToSend +"\",\n"
-        " \"data\": \""+dataToSend+"\"\n"
-        "}\n";
-//        postBody=postBody+
-//        "{\n"+
-//        " \"esp_id\": \""+esp_id+"\",\n"+
-//        " \"timestamp\": \""+ localitzationToSend +"\",\n"+
-//        " \"delay\": \""+ localitzationToSend +"\",\n"+
-//        " \"volume\": \""+dataToSend+"\"\n"+
-//        "}\n";
-    }else{
-        postBody=postBody+
-        "{\n"+
-        " \"esp_id\": \""+esp_id+"\",\n"+
-        " \"timestamp\": \""+ localitzationToSend +"\",\n"+
-        " \"delay\": \""+ localitzationToSend +"\",\n"+
-        " \"volume\": \""+dataToSend+"\"\n"+
-        "}\n";
-    }
+    postBody=postBody+
+    "{\n"
+    " \"esp_id\": \""+esp_ip+"\",\n"
+    " \"EOF\": \""+EOFtoSend+"\",\n"
+    " \"location\": \""+ localitzationToSend +"\",\n"
+    " \"data\": \""+dataToSend+"\"\n"
+    "}\n";
 
     String postHeader=
     method+" "+uri+" HTTP/1.1\n"
@@ -1093,6 +1076,7 @@ String makeHTTPrequest(String method, String uri, String type, String data, uint
 
     return postHeader+postBody;
 }
+
 double computeVolume(double *wave){
     double sumP = 0;
     double pot = 0;
@@ -1104,4 +1088,10 @@ double computeVolume(double *wave){
 
     return pot;
 
+}
+
+String makeHTTPaudio(String esp_ip, String postBody, boolean EndOfFile){
+    String header="POST /audio/";
+    header=header+esp_ip+"/"+String(EndOfFile)+" HTTP/1.1\n"+"content-type: text/plain\n"+"content-Length: "+String(postBody.length())+"\n\n";
+    return header+postBody;
 }
