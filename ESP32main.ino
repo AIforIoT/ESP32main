@@ -317,29 +317,37 @@ void codeForMicroInput( void * parameter){
   /*SAMPLING*/
   while(true){
 
+    int16_t mic_sample = 0;
+    int16_t mic_val = 0;
 
-    int32_t mic_sample = 0;
-    int32_t mic_val = 0;
-
-    for(int i=0; i<Nwave; i++) //Bucle que lee muestras de audio
+    for(int i=0; i<Nwave*4; i++) //Bucle que lee muestras de audio
     {
+
+      //read 24 bits of signed data into a 48 bit signed container
      if (i2s_pop_sample(I2S_NUM_1, (char*)&mic_sample, portMAX_DELAY) == 2) {
 
+      //like: https://forums.adafruit.com/viewtopic.php?f=19&t=125101 ICS-43434 is 1 pulse late
       //The MSBit is actually a false bit (always 1), the MSB of the real data is actually the second bit
 
-      //Porting a 15 signed number into a 32 bits we note sign which is '-' if bit 23 is '1'
+      //Porting a 23 signed number into a 32 bits we note sign which is '-' if bit 23 is '1'
       mic_val = (mic_sample & 0x4000) ?
                    //Negative: B/c of 2compliment unused bits left of the sign bit need to be '1's
-                   (mic_sample | 0xFFFF8000) :
+                   (mic_sample | 0x8000) :
                    //Positive: B/c of 2compliment unused bits left of the sign bit need to be '0's
                    (mic_sample & 0x7FFF);
 
-      wave[i] = mic_val;
-      byte1 = mic_sample&(0x00FF);
-      byte2 = mic_sample >> 8;
-      waveString += (String)byte2 + (String)byte1;
+           //mic_sample <<= 1; //scale back up to proper 3 byte size unless you don't care
+
+        //printBarForGraph(abs(mic_sample));
+        wave[i] = mic_val;
+        byte1 = mic_sample&(0xFF);
+        byte2 = mic_sample >> 8;
+        //codificacion
+        //waveString += ((String)wave[i] + ","); //AMB COMA?? //hh
+        waveString += (String)mic_val + "\n";
 
       }
+
     }
 
 //      for(int i=0; i<Nwave; i++){
@@ -975,7 +983,7 @@ void setup(){
         NULL,                     //parameter of the task
         1,                        //priority of the task
         &taskFFT,                   //Task handle to keep track of created task
-        0);                       //core
+        1);                       //core
 
 
     xTaskCreatePinnedToCore(
