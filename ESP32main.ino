@@ -886,6 +886,7 @@ void setup(){
                     //Now we have the login information we try to connect to raspi.
                     Serial.print("Attempting to connect to SSID: ");
                     Serial.println(ssid);
+                    WiFi.mode(WIFI_STA);
                     WiFi.begin(ssid.c_str(), password.c_str());
                     int count=20;
                     while (WiFi.status() != WL_CONNECTED && count>=0) {
