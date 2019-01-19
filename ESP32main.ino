@@ -148,36 +148,35 @@
     #define SCL_TIME 0x01
     #define SCL_FREQUENCY 0x02
     #define SCL_PLOT 0x03
-    const uint16_t samples = 1024; //This value MUST ALWAYS be a power of 2
-    const int Nwave = 1024;
+    const int Nwave = 1024; //This value MUST ALWAYS be a power of 2
     const double samplingFrequency = 16000; //Hz
 
     //INPUT VARIABLES
-    unsigned int sampling_period_us;
-    unsigned long microsecondsFFT;
-    unsigned long microsecondsLectura;
     boolean isVoice = 0;
-    int noVoiceCounter = 0;
     int tramas4Segundos = 32;
     volatile boolean calcularFFT = 1;
-    int numTramaFFT = 0;
-    int numTramaLectura = 0;
     volatile boolean tramaNueva = 0;
-    volatile boolean concat;
+    volatile boolean concat = 0;
+    volatile boolean newAudio = 1;
     double volumen;
     volatile int numTramasGuardadas = 0;
     const int tramas1Segundo = 16;
     volatile boolean silencio = 0;
     boolean quieroVolumen;
-    int tramas10Segundos = 156;
+    int tramas10Segundos = 22; //156;
     int numTramasEnviadas;
+    int numTramasTotal;
+    int bufferPrevSize = 10; //En tramas
+
+    char byte1 = 0;
+    char byte2 = 0;
 
     /*
     These are the input and output vectors
     Input vectors receive computed results from FFT
     */
-    double vReal[samples];
-    double vImag[samples];
+    double vReal[Nwave];
+    double vImag[Nwave];
     double tramaFFT[Nwave];
     double wave[Nwave];
     double waveForFFT[Nwave];
@@ -185,6 +184,7 @@
     String waveAntS2;
     String savedAudio;
     String waveString;
+    String audioToSend = "";
 
 
 //WIFI INIT
@@ -221,7 +221,6 @@
     SemaphoreHandle_t stateSemaphore = NULL;
     SemaphoreHandle_t fftSemaphore = NULL;
     String data = "";
-    //int localitzationDelta=45;
     boolean EndOfFile;
 
 
@@ -319,237 +318,245 @@ void reinitializeTimer(){
 
 void codeForMicroInput( void * parameter){
     /*SAMPLING*/
-  while(true){
-    numTramaLectura++;
+    while(true){
 
+        int16_t mic_sample = 0;
+        int16_t mic_val = 0;
 
-    int32_t mic_sample = 0;
+        for(int i=0; i<Nwave; i++) //Bucle que lee muestras de audio
+        {
 
-    for(int i=0; i<Nwave; i++) //Bucle que lee muestras de audio
-    {
+            //read 24 bits of signed data into a 48 bit signed container
+            if (i2s_pop_sample(I2S_NUM_1, (char*)&mic_sample, portMAX_DELAY) == 2) {
 
-      //read 24 bits of signed data into a 48 bit signed container
-      if (i2s_pop_sample(I2S_NUM_1, (char*)&mic_sample, portMAX_DELAY) == 4) {
+                //like: https://forums.adafruit.com/viewtopic.php?f=19&t=125101 ICS-43434 is 1 pulse late
+                //The MSBit is actually a false bit (always 1), the MSB of the real data is actually the second bit
 
-        //Porting a 23 signed number into a 32 bits we note sign which is '-' if bit 23 is '1'
-        mic_sample = (mic_sample & 0x400000) ?
-                     //Negative: B/c of 2compliment unused bits left of the sign bit need to be '1's
-                     (mic_sample | 0xFF800000) :
-                     //Positive: B/c of 2compliment unused bits left of the sign bit need to be '0's
-                     (mic_sample & 0x7FFFFF);
+                //Porting a 23 signed number into a 32 bits we note sign which is '-' if bit 23 is '1'
+                mic_val = (mic_sample & 0x4000) ?
+                //Negative: B/c of 2compliment unused bits left of the sign bit need to be '1's
+                (mic_sample | 0x8000) :
+                //Positive: B/c of 2compliment unused bits left of the sign bit need to be '0's
+                (mic_sample & 0x7FFF);
 
-           //mic_sample <<= 1; //scale back up to proper 3 byte size unless you don't care
+                //mic_sample <<= 1; //scale back up to proper 3 byte size unless you don't care
 
-        //printBarForGraph(abs(mic_sample));
-        wave[i] = mic_sample;
-        waveString += ((String)wave[i] + ","); //AMB COMA??
+                wave[i] = mic_val;
+                /*per enviar nums creixents*/
+                //cont++;
+                //mic_sample = cont%255;
+                /**/
+                /*CODIFICATION*/
+                byte1 = mic_sample&(0x00FF);  //El byte mes significatiu
+                byte2 = mic_sample >> 8;      //El byte menys significatiu
+                /*CODIFICATION ZEROS*/ //NULL is not sent, so we can't send '0'
+                if ((mic_sample >> 8) == 0 && (mic_sample&(0x00FF)) == 0){ //In case both byte are 0
+                  waveString += ((String)(char)10000000 + (String)(char)00000001);
+                }else if((mic_sample&(0x00FF)) == 0){ //In case byte1 is 0
+                  waveString += ((String)byte2 + (String)(char)00000001);
+                }else if((mic_sample >> 8) == 0){ //In case byte2 is 0
+                  waveString += ((String)(char)10000000 + (String)byte1);
+                }else{
+                  waveString += ((String)byte2 + (String)byte1);
+                }
 
-      }
-
-    }
-
-
-
-      for(int i=0; i<Nwave; i++){
-
-            waveForFFT[i] = wave[i];
-      }
-
-
-     if (!concat){
-        //Guardar tramas anteriores
-        waveAntS2 = waveAntS;
-        waveAntS = waveString;
-        savedAudio = waveAntS2 + waveAntS + waveString;
-        numTramasGuardadas = 3;
-
-    }else{
-        //Concantenar el audio que vas recibiendo
-        savedAudio += waveString;
-        //Serial.println("Concatenando...");
-        numTramasGuardadas++;
-    }
-
-
-
-
-        tramaNueva = 1;
-        calcularFFT = !calcularFFT;
-
-        vTaskDelay(1);
-
-        if(tramaNueva == 1 && calcularFFT == 1){
-          vTaskResume(taskFFT);
+            }
 
         }
+        if (!concat && newAudio){ //To save audio previous to detecting voice
+            if(savedAudio.length() >= 2*bufferPrevSize*Nwave){
+                savedAudio.remove(0, 2*Nwave);
+                savedAudio += waveString;
+                waveString = "";
+                numTramasGuardadas = bufferPrevSize;
+            } else {
+                savedAudio += waveString;
+                waveString = "";
+                numTramasGuardadas++;
+                Serial.println("---------------------------------------ESPERA...");
+            }
+        }else if(!concat && !newAudio){ //To not concatenate or save previous audio
+       //BUIT
+        }else if(concat){  //To concatenate certain seconds of audio while sending it
+           //Concantenar el audio que vas recibiendo
+           savedAudio += waveString;
+           waveString = "";
+           //Serial.println("Concatenando...");
+           numTramasGuardadas++;
+           numTramasTotal++;
+        }
 
-
-  }
-
+    }
 }
 
 
 
 void computeFFT(void *parameter){
 
+   /*Local variables*/
    int localState;
    int localRaspiListening;
-//   boolean localTramaNueva;
-//   boolean localCalcularFFT;
 
-   Serial.println("------------------->> Entra FFT");
+    while(true){
 
+        for(int i=0; i<Nwave; i++) //Reading of 1024 samples of audio
+        {
+            vReal[i] = wave[i];
+            tramaFFT[i] = wave[i];
+            vImag[i] = 0;
+        }
 
+        arduinoFFT FFT = arduinoFFT(); /* Create FFT object */
 
-  while(true){
+        FFT.Windowing(vReal, Nwave, FFT_WIN_TYP_HAMMING, FFT_FORWARD);  /* Weigh data */
+        FFT.Compute(vReal, vImag, Nwave, FFT_FORWARD); /* Compute FFT */
+        FFT.ComplexToMagnitude(vReal, vImag, Nwave); /* Compute magnitudes */
+        double x = FFT.MajorPeak(vReal, Nwave, samplingFrequency);
 
-    numTramaFFT = numTramaFFT + 2;
-    microsecondsFFT = micros();
+        if(x > 85.0 && x < 255.0){ //x is the peak frequency, it detects voice if this value is between 85 Hz and 255 Hz
+            //Serial.println("-----------------------Voz");
+            isVoice = 1;
+            volumen = computeVolume(tramaFFT);
+        }else{
+            isVoice = 0;
+        }
 
-   for(int i=0; i<samples; i++) //Bucle que lee 1024 muestras de audio
-    {
-      vReal[i] = wave[i];
-      //Serial.println("-----------------> vReal[" +(String)i + "] (" + (String)numTramaFFT + ") = " + (String)vReal[i]);
-      tramaFFT[i] = wave[i];
-      vImag[i] = 0;
+        localitzationDelta=random(30, 10000); //BORRARRRRRRRRRRRRRRRRR cuando este lo otro
 
-    }
-
-    arduinoFFT FFT = arduinoFFT(); /* Create FFT object */
-
-    FFT.Windowing(vReal, samples, FFT_WIN_TYP_HAMMING, FFT_FORWARD);  /* Weigh data */
-    FFT.Compute(vReal, vImag, samples, FFT_FORWARD); /* Compute FFT */
-    FFT.ComplexToMagnitude(vReal, vImag, samples); /* Compute magnitudes */  //Freq + alta 4482.421875Hz
-    double x = FFT.MajorPeak(vReal, samples, samplingFrequency);
-
-    if(x > 85.0 && x < 255.0){
-        Serial.println("-----------------------Voz");
-        isVoice = 1;
-        noVoiceCounter = 0;
-        volumen = computeVolume(tramaFFT);
-        Serial.println(x);
-    }else{
-      Serial.println("Otra cosa");
-      Serial.println(x);
-      isVoice = 0;
-      noVoiceCounter++;
-    }
-
-
-    if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
-    {
-        // We were able to obtain the semaphore and can now access the
-        // shared resource.
-        localState = state_env;
-        localRaspiListening = raspiListening;
-        // We have finished accessing the shared resource.  Release the
-        // semaphore.
-        xSemaphoreGive( stateSemaphore );
-    }
-
-    if(localState == IDLE && localRaspiListening == 0){
-
-         noVoiceCounter = 0;
-        savedAudio= " ";
-        concat = 0;
-        numTramasGuardadas = 0;
-
-    }else if(localState == IDLE && isVoice == 1 && localRaspiListening == 1){
-          concat = 1;
-
-
-
-      if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
-      {
-          // We were able to obtain the semaphore and can now access the
-          // shared resource.
-          state_env = VOLUME;
-          // We have finished accessing the shared resource.  Release the
-          // semaphore.
-          xSemaphoreGive( stateSemaphore );
-      }
-
-        if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
+        //The value of state_env and raspiListening depend on the Server thread
+        if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
         {
             // We were able to obtain the semaphore and can now access the
             // shared resource.
-            data = (String)volumen;
+            localState = state_env;
+            localRaspiListening = raspiListening;
             // We have finished accessing the shared resource.  Release the
             // semaphore.
-            xSemaphoreGive( dataSemaphore );
+            xSemaphoreGive( stateSemaphore );
         }
 
-      //asignar con semaforo
-      Serial.println("-------------------------------------------->Petición");
-      Serial.println((String)volumen);
-      vTaskResume(esp32Client);
+        /*TO SEND*/
 
-     }
+        if(localState == IDLE && localRaspiListening == 0){
 
+            concat = 0;
+            numTramasGuardadas = 0;
 
-    //Para de enviar cuando pasan 4 segundos de silencio o maximo 10 segundos de
+        }else if(localState == IDLE && isVoice == 1 && localRaspiListening == 1 && savedAudio.length() >= 2*bufferPrevSize*Nwave){
+            concat = 1;
 
-    if(localState == AUDIO){
-      Serial.print("Num Trama: ");
-      Serial.println(numTramasGuardadas);
+            if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
+            {
+                // We were able to obtain the semaphore and can now access the
+                // shared resource.
+                state_env = VOLUME;
+                // We have finished accessing the shared resource.  Release the
+                // semaphore.
+                xSemaphoreGive( stateSemaphore );
+            }
 
- /*     if( numTramasGuardadas == tramas1Segundo){ //Envia audio de 1 segundo cada vez
+            if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
+            {
+                // We were able to obtain the semaphore and can now access the
+                // shared resource.
+                data = (String)volumen;
+                // We have finished accessing the shared resource.  Release the
+                // semaphore.
+                xSemaphoreGive( dataSemaphore );
+            }
 
-        //envia audio
+            //asignar con semaforo
+            Serial.println("-------------------------------------------->Petición");
+            Serial.println((String)volumen);
+            //Serial.println(savedAudio.length());
+            vTaskResume(esp32Client);
 
-
-        savedAudio = " ";
-        //asignar con semaforo
-        vTaskResume(esp32Client);
-
-        numTramasEnviadas += numTramasGuardadas;
-        numTramasGuardadas = 0;
-        Serial.println("enviando...");
-      }else */
-
-      if((numTramasGuardadas >= tramas10Segundos || noVoiceCounter >= tramas4Segundos)){
-
-        if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
-        {
-            // We were able to obtain the semaphore and can now access the
-            // shared resource.
-            data = savedAudio;
-            // We have finished accessing the shared resource.  Release the
-            // semaphore.
-            xSemaphoreGive( dataSemaphore );
         }
 
-        Serial.println(savedAudio);
+        if(localState == AUDIO){
 
-        if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
-        {
-            // We were able to obtain the semaphore and can now access the
-            // shared resource.
-            EndOfFile = true;
-            // We have finished accessing the shared resource.  Release the
-            // semaphore.
-            xSemaphoreGive( dataSemaphore );
+            if(savedAudio.length() <= 2*3*Nwave){ //When there is less than 2*3*1024 characters in savedAudio, it is sent with the End of File
+
+                //Serial.println(prova);
+
+                if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
+                {
+                    // We were able to obtain the semaphore and can now access the
+                    // shared resource.
+                    data = savedAudio;
+                    // We have finished accessing the shared resource.  Release the
+                    // semaphore.
+                    xSemaphoreGive( dataSemaphore );
+                }
+
+                if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
+                {
+                    // We were able to obtain the semaphore and can now access the
+                    // shared resource.
+                    EndOfFile = true;
+                    // We have finished accessing the shared resource.  Release the
+                    // semaphore.
+                    xSemaphoreGive( dataSemaphore );
+                }
+
+                vTaskResume(esp32Client);
+                Serial.println("Enviado");
+
+                /*Reiniciamos variables*/
+                savedAudio= "";
+                newAudio = 1;
+                numTramasEnviadas = 0;
+                numTramasGuardadas = 0;
+                numTramasTotal = 0;
+
+            } else {
+
+                int indFin = Nwave*2*3; //3 tramas
+                if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
+                {
+                    // We were able to obtain the semaphore and can now access the
+                    // shared resource.
+                    //data = savedAudio;
+                    data = savedAudio.substring(0, indFin);
+                    // We have finished accessing the shared resource.  Release the
+                    // semaphore.
+                    xSemaphoreGive( dataSemaphore );
+                }
+
+                savedAudio.remove(0, indFin);
+
+                vTaskResume(esp32Client);
+
+                /*Provisional*/
+                /* Serial.print("Tramas Enviadas: ");
+                Serial.println(numTramasEnviadas);
+                Serial.print("Tramas Guardadas: ");
+                Serial.print(numTramasGuardadas);
+                Serial.print("-->");
+                Serial.println(savedAudio.length());
+                Serial.print("-->");
+                Serial.println(data.length());
+                Serial.print("Tramas Total: ");
+                Serial.println(numTramasTotal);*/
+                /**/
+
+                numTramasEnviadas += 6;
+                numTramasGuardadas -= 6;
+
+                //Serial.println("enviando...");
+                if((numTramasTotal >= tramas10Segundos)){
+                    newAudio = 0;
+                    concat = 0;
+                    waveAntS = "";
+                    waveAntS2 = "";
+                }
+            }
+        // vTaskSuspend(taskFFT);
+        vTaskDelay(300);
         }
-
-        vTaskResume(esp32Client);
-        Serial.println("Enviado");
-
-        noVoiceCounter = 0;
-        savedAudio= " ";
-        concat = 0;
-        numTramasGuardadas = 0;
-      }
-
     }
-
-
-   // tramaNueva = 0;
-   //Serial.println("S'adorm");
-    vTaskSuspend(taskFFT);
-  }
-
-
 }
+
 
 void codeForServer( void * parameter){
 
