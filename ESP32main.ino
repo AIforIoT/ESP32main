@@ -942,7 +942,7 @@ void setup(){
         //Connected to system WIFI, begin RASPI handshke:
         //if there's a successful connection:
         if (client.connect(raspip.c_str(), 8080)) {
-            Serial.println("connecting...");
+            //Serial.println("connecting...");
 
             // send the HTTP GET request:
             String dataToSend = "{\n"
@@ -1074,9 +1074,9 @@ String makeHTTPrequest(String method, String uri, String type, String data, uint
     postBody=postBody+
     "{\n"
     " \"esp_id\": \""+esp_ip+"\",\n"
-    " \"EOF\": \""+EOFtoSend+"\",\n"
-    " \"location\": \""+ localitzationToSend +"\",\n"
-    " \"data\": \""+dataToSend+"\"\n"
+    " \"timestamp\": \""+EOFtoSend+"\",\n"
+    " \"delay\": \""+ localitzationToSend +"\",\n"
+    " \"volume\": \""+dataToSend+"\"\n"
     "}\n";
 
     String postHeader=
