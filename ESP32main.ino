@@ -163,7 +163,7 @@
     const int tramas1Segundo = 16;
     volatile boolean silencio = 0;
     boolean quieroVolumen;
-    int tramas10Segundos = 22; //156;
+    int tramas10Segundos = 100; //156;
     int numTramasEnviadas;
     int numTramasTotal;
     int bufferPrevSize = 10; //En tramas
@@ -277,21 +277,21 @@ void codeForBeacons( void * parameter){
 
       udp.onPacket([](AsyncUDPPacket packet) {
 
-        Serial.print("UDP Packet Type: ");
-        Serial.print(packet.isBroadcast()?"Broadcast":packet.isMulticast()?"Multicast":"Unicast");
-        Serial.print(", From: ");
-        Serial.print(packet.remoteIP());
-        Serial.print(":");
-        Serial.print(packet.remotePort());
-        Serial.print(", To: ");
-        Serial.print(packet.localIP());
-        Serial.print(":");
-        Serial.print(packet.localPort());
-        Serial.print(", Length: ");
-        Serial.print(packet.length());
-        Serial.print(", Data: ");
-        Serial.write(packet.data(), packet.length());
-        Serial.println();
+//        Serial.print("UDP Packet Type: ");
+//        Serial.print(packet.isBroadcast()?"Broadcast":packet.isMulticast()?"Multicast":"Unicast");
+//        Serial.print(", From: ");
+//        Serial.print(packet.remoteIP());
+//        Serial.print(":");
+//        Serial.print(packet.remotePort());
+//        Serial.print(", To: ");
+//        Serial.print(packet.localIP());
+//        Serial.print(":");
+//        Serial.print(packet.localPort());
+//        Serial.print(", Length: ");
+//        Serial.print(packet.length());
+//        Serial.print(", Data: ");
+//        Serial.write(packet.data(), packet.length());
+//        Serial.println();
         //reply to the client
 
         if(packet.remoteIP().toString()==raspip){
@@ -1020,7 +1020,7 @@ void setup(){
         NULL,                     //parameter of the task
         1,                        //priority of the task
         &taskFFT,                   //Task handle to keep track of created task
-        0);                       //core
+        1);                       //core
 
 
     xTaskCreatePinnedToCore(
@@ -1052,7 +1052,7 @@ void loop(){
 //    while(true){
         //Serial.println(state_env);
 //    }
-    vTaskDelay(1000);
+    vTaskDelay(2000);
     Serial.println("----------------------------------->" + (String)state_env);
 }
 
@@ -1074,6 +1074,9 @@ String makeHTTPrequest(String method, String uri, String type, String data, uint
         // We have finished accessing the shared resource.  Release the
         // semaphore.
         xSemaphoreGive( dataSemaphore );
+    }
+    if(localitzationToSend=="00"){
+      localitzationToSend="0";
     }
     postBody=postBody+
     "{\n"
