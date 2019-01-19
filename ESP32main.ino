@@ -243,7 +243,7 @@
     i2s_config_t i2s_config_rx  = {
       mode: (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX),
       sample_rate: sample_rate,
-      bits_per_sample: I2S_BITS_PER_SAMPLE_32BIT, //(i2s_bits_per_sample_t)48,    // Only 8-bit DAC support
+      bits_per_sample: I2S_BITS_PER_SAMPLE_16BIT, //(i2s_bits_per_sample_t)48,    // Only 8-bit DAC support
       channel_format: I2S_CHANNEL_FMT_ONLY_RIGHT,   // 2-channels
       communication_format: (i2s_comm_format_t)(I2S_COMM_FORMAT_I2S | I2S_COMM_FORMAT_I2S_LSB),
       intr_alloc_flags: ESP_INTR_FLAG_LEVEL1,        // Interrupt level 1
@@ -749,11 +749,14 @@ void setup(){
     pinMode(33, OUTPUT);       // set the RELAY pin mode
     pinMode(32, OUTPUT);      // set the RELAY pin mode
     Serial.begin(115200);
-    sampling_period_us = round(1000000*(1.0/samplingFrequency));
 
     vSemaphoreCreateBinary( dataSemaphore );
     vSemaphoreCreateBinary( stateSemaphore );
     vSemaphoreCreateBinary( fftSemaphore );
+
+    i2s_driver_install(I2S_NUM_1, &i2s_config_rx, 0, NULL);
+    i2s_set_pin(I2S_NUM_1, &pin_config_rx);
+    i2s_zero_dma_buffer(I2S_NUM_1);
 
     //***********************************************
     //                  LOGIN CODE
@@ -947,7 +950,6 @@ void setup(){
                                 "\"esp_ip\": \""+esp_ip+"\",\n"
                                 "\"esp_type\": \""+type+"\",\n"
                                 "\"esp_x_axis\": \""+xPos+"\",\n"
-                                "\"esp_y_axis\": \""+yPos+"\",\n"
                                 "\"esp_y_axis\": \""+yPos+"\",\n"
                                 "\"side\": \""+side+"\",\n"
                                 "\"location\": \""+location+"\"\n"
