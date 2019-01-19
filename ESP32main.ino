@@ -421,7 +421,7 @@ void computeFFT(void *parameter){
             isVoice = 0;
         }
 
-        
+
 
         //The value of state_env and raspiListening depend on the Server thread
         if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
@@ -517,7 +517,11 @@ void computeFFT(void *parameter){
                     // We were able to obtain the semaphore and can now access the
                     // shared resource.
                     //data = savedAudio;
+                    Serial.println("-----------------------------savedAudio-------------------------------");
+                    Serial.println(savedAudio.substring(0, indFin));
                     data = savedAudio.substring(0, indFin);
+                    Serial.println("-----------------------------data-------------------------------");
+                    Serial.println(data);
                     // We have finished accessing the shared resource.  Release the
                     // semaphore.
                     xSemaphoreGive( dataSemaphore );
