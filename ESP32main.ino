@@ -421,7 +421,7 @@ void computeFFT(void *parameter){
             isVoice = 0;
         }
 
-        localitzationDelta=random(30, 10000); //BORRARRRRRRRRRRRRRRRRR cuando este lo otro
+        
 
         //The value of state_env and raspiListening depend on the Server thread
         if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
