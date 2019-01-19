@@ -57,6 +57,7 @@
     int tramas10Segundos = 22; //156;
     int numTramasEnviadas;
     int numTramasTotal;
+    int bufferPrevSize = 10; //En tramas 
 
     char byte1 = 0;
     char byte2 = 0;
@@ -239,8 +240,8 @@ void codeForMicroInput( void * parameter){
        
         wave[i] = mic_val;
         /*per enviar nums creixents*/
-        cont++;
-        mic_sample = cont%255;
+        //cont++;
+        //mic_sample = cont%255;
         /**/
         /*CODIFICATION*/
         byte1 = mic_sample&(0x00FF);  //El byte mes significatiu
@@ -262,11 +263,11 @@ void codeForMicroInput( void * parameter){
 
       
        if (!concat && newAudio){ //To save audio previous to detecting voice  
-            if(savedAudio.length() >= 20*1024){
-              savedAudio.remove(0, 2048);
+            if(savedAudio.length() >= 2*bufferPrevSize*Nwave){
+              savedAudio.remove(0, 2*Nwave);
               savedAudio += waveString;
               waveString = "";          
-              numTramasGuardadas = 10;                    
+              numTramasGuardadas = bufferPrevSize;                    
             } else {
               savedAudio += waveString;
               waveString = "";
@@ -320,7 +321,7 @@ void computeFFT(void *parameter){
       isVoice = 0;
     }
 
-    localitzationDelta=random(30, 10000); //BORRARRRRRRRRRRRRRRRRR
+    localitzationDelta=random(30, 10000); //BORRARRRRRRRRRRRRRRRRR cuando este lo otro
 
     //The value of state_env and raspiListening depend on the Server thread
     if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
@@ -341,7 +342,7 @@ void computeFFT(void *parameter){
         concat = 0;
         numTramasGuardadas = 0;
 
-    }else if(localState == IDLE && /*isVoice == 1 &&*/ localRaspiListening == 1 && savedAudio.length() == 20*1024){ 
+    }else if(localState == IDLE && isVoice == 1 && localRaspiListening == 1 && savedAudio.length() >= 2*bufferPrevSize*Nwave){ 
           concat = 1;
 
       if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
@@ -374,7 +375,7 @@ void computeFFT(void *parameter){
 
     if(localState == AUDIO){
 
-      if(savedAudio.length() <= 6*1024){ //When there is less than 6*1024 characters in savedAudio, it is sent with the End of File
+      if(savedAudio.length() <= 2*3*Nwave){ //When there is less than 2*3*1024 characters in savedAudio, it is sent with the End of File
 
         //Serial.println(prova);
 
@@ -410,7 +411,7 @@ void computeFFT(void *parameter){
 
       } else { 
 
-       int indFin = Nwave*6; //3 tramas
+       int indFin = Nwave*2*3; //3 tramas
        if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
          {
              // We were able to obtain the semaphore and can now access the
@@ -419,7 +420,7 @@ void computeFFT(void *parameter){
              data = savedAudio.substring(0, indFin);
              // We have finished accessing the shared resource.  Release the
              // semaphore.
-             xSemaphoreGive( dataSemaphore );
+             xSemaphoreGive( dataSemaphore );  
          }
          
          savedAudio.remove(0, indFin); 
@@ -734,5 +735,3 @@ void loop(){
     vTaskDelay(1000);
     Serial.println("----------------------------------->" + (String)state_env);
 }
-
-
