@@ -417,6 +417,7 @@ void computeFFT(void *parameter){
         //Serial.println("-----------------------Voz");
         isVoice = 1;
         volume = computeVolume(tramaFFT);
+//        Serial.println(volume);
     }else{
       isVoice = 0;
     }
@@ -646,7 +647,10 @@ void codeForServer( void * parameter){
                         if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
                         {
                             // We were able to obtain the semaphore and can now access the
-                            // shared resource.
+                            // shared resource
+                            if(state_env==WAITRESPONSE){
+                                state_env=VOLUME;
+                            }
                             raspiListening=true;
                             // We have finished accessing the shared resource.  Release the
                             // semaphore.
