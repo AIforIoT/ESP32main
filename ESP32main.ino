@@ -161,6 +161,7 @@
     int tramas10Segundos = 45; //156;
     int numTramasEnviadas;
     int numTramasTotal;
+    int framesPacket = 3;
     double volumeThreshold = 700.0;
     int bufferPrevSize = 4; //En tramas
     float zeros = 0;
@@ -474,7 +475,7 @@ void computeFFT(void *parameter){
 
     } else if(localState == AUDIO){
 
-      if(savedAudio.length() <= 1*2*1024){ //When there is less than 6*1024 characters in savedAudio, it is sent with the End of File
+      if(savedAudio.length() <= framesPacket*2*1024){ //When there is less than 6*1024 characters in savedAudio, it is sent with the End of File
 
         //Serial.println(prova);
 
@@ -513,7 +514,7 @@ void computeFFT(void *parameter){
 
       } else { 
 
-       int indFin = Nwave*1*2; //3 tramas
+       int indFin = Nwave*framesPacket*2; //3 tramas
        if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
          {
              // We were able to obtain the semaphore and can now access the
@@ -542,14 +543,14 @@ void computeFFT(void *parameter){
          Serial.println(numTramasTotal);
          /**/
 
-         numTramasEnviadas += 1;
-         numTramasGuardadas -= 1;
+         numTramasEnviadas += framesPacket;
+         numTramasGuardadas -= framesPacket;
 
          //Serial.println("enviando...");
     }
   }
+  vTaskDelay(300);
  } 
- vTaskDelay(100);
 }
 
 
