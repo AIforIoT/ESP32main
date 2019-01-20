@@ -985,9 +985,9 @@ void setup(){
     Serial.println("INIT sequence start");
 
     //HARDWARE CHECK
-    digitalWrite(33, HIGH);
+    digitalWrite(19, HIGH);
     delay(1000);
-    digitalWrite(33, LOW);
+    digitalWrite(19, LOW);
     delay(1000);
     digitalWrite(32, HIGH);
     delay(1000);
