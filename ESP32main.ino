@@ -163,10 +163,10 @@
     const int tramas1Segundo = 16;
     volatile boolean silencio = 0;
     boolean quieroVolumen;
-    int tramas10Segundos = 100; //156;
+    int tramas10Segundos = 50; //156;
     int numTramasEnviadas;
     int numTramasTotal;
-    int bufferPrevSize = 10; //En tramas
+    int bufferPrevSize = 3; //En tramas
 
     char byte1 = 0;
     char byte2 = 0;
@@ -475,7 +475,7 @@ void computeFFT(void *parameter){
 
         if(localState == AUDIO){
 
-            if(savedAudio.length() <= 2*3*Nwave){ //When there is less than 2*3*1024 characters in savedAudio, it is sent with the End of File
+            if(savedAudio.length() <= 2*1*Nwave){ //When there is less than 2*3*1024 characters in savedAudio, it is sent with the End of File
 
                 //Serial.println(prova);
 
@@ -511,7 +511,7 @@ void computeFFT(void *parameter){
 
             } else {
 
-                int indFin = Nwave*2*3; //3 tramas
+                int indFin = Nwave*2*1; //3 tramas
                 if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
                 {
                     // We were able to obtain the semaphore and can now access the
@@ -544,8 +544,8 @@ void computeFFT(void *parameter){
                 Serial.println(numTramasTotal);*/
                 /**/
 
-                numTramasEnviadas += 6;
-                numTramasGuardadas -= 6;
+                numTramasEnviadas += 1;
+                numTramasGuardadas -= 1;
 
                 //Serial.println("enviando...");
                 if((numTramasTotal >= tramas10Segundos)){
@@ -591,7 +591,7 @@ void codeForServer( void * parameter){
                     currentLine += c;      // add it to the end of the currentLine
                     // Check to see if the client request was "GET /H" or "GET /L":
                     if (currentLine.endsWith("GET /H ")) {
-                        digitalWrite(33, HIGH);               // GET /H turns the REALY on
+                        digitalWrite(19, HIGH);               // GET /H turns the REALY on
                         client.println("HTTP/1.1 200 OK");
                         client.println();
                         //Serial.println("H request detected");
@@ -600,7 +600,7 @@ void codeForServer( void * parameter){
                         break;
 
                     }else if (currentLine.endsWith("GET /L ")) {
-                        digitalWrite(33, LOW);                // GET /L turns the RELAY off
+                        digitalWrite(19, LOW);                // GET /L turns the RELAY off
                         client.println("HTTP/1.1 200 OK");
                         client.println();
                         Serial.println("L request detected");
@@ -750,7 +750,7 @@ void codeForClient( void * parameter){
 
 //Start execution
 void setup(){
-    pinMode(33, OUTPUT);       // set the RELAY pin mode
+    pinMode(19, OUTPUT);       // set the RELAY pin mode
     pinMode(32, OUTPUT);      // set the RELAY pin mode
     Serial.begin(115200);
 
