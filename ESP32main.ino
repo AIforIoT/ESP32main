@@ -241,22 +241,22 @@
 
     /* RX: I2S_NUM_1 */
     i2s_config_t i2s_config_rx  = {
-      mode: (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX),
-      sample_rate: sample_rate,
-      bits_per_sample: I2S_BITS_PER_SAMPLE_16BIT, //(i2s_bits_per_sample_t)48,    // Only 8-bit DAC support
-      channel_format: I2S_CHANNEL_FMT_ONLY_RIGHT,   // 2-channels
-      communication_format: (i2s_comm_format_t)(I2S_COMM_FORMAT_I2S | I2S_COMM_FORMAT_I2S_LSB),
-      intr_alloc_flags: ESP_INTR_FLAG_LEVEL1,        // Interrupt level 1
+        mode: (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX),
+        sample_rate: sample_rate,
+        bits_per_sample: I2S_BITS_PER_SAMPLE_16BIT, //(i2s_bits_per_sample_t)48,    // Only 8-bit DAC support
+        channel_format: I2S_CHANNEL_FMT_ONLY_RIGHT,   // 2-channels
+        communication_format: (i2s_comm_format_t)(I2S_COMM_FORMAT_I2S | I2S_COMM_FORMAT_I2S_LSB),
+        intr_alloc_flags: ESP_INTR_FLAG_LEVEL1,        // Interrupt level 1
         dma_buf_count: 8,                            // number of buffers, 128 max.
         dma_buf_len: 8                          // size of each buffer
     };
 
     i2s_pin_config_t pin_config_rx = {
-      bck_io_num: GPIO_NUM_26,
-      ws_io_num: GPIO_NUM_25,
-      data_out_num: I2S_PIN_NO_CHANGE,
-      data_in_num: GPIO_NUM_22
-      };
+        bck_io_num: GPIO_NUM_26,
+        ws_io_num: GPIO_NUM_25,
+        data_out_num: I2S_PIN_NO_CHANGE,
+        data_in_num: GPIO_NUM_22
+        };
     };
 
 
@@ -423,16 +423,12 @@ void computeFFT(void *parameter){
 
 
         //The value of state_env and raspiListening depend on the Server thread
-        if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
-        {
-            // We were able to obtain the semaphore and can now access the
-            // shared resource.
-            localState = state_env;
-            localRaspiListening = raspiListening;
-            // We have finished accessing the shared resource.  Release the
-            // semaphore.
-            xSemaphoreGive( stateSemaphore );
-        }
+        // We were able to obtain the semaphore and can now access the
+        // shared resource.
+        localState = state_env;
+        localRaspiListening = raspiListening;
+        // We have finished accessing the shared resource.  Release the
+        // semaphore.
 
         /*TO SEND*/
 
@@ -444,25 +440,19 @@ void computeFFT(void *parameter){
         }else if(localState == IDLE && isVoice == 1 && localRaspiListening == 1 && savedAudio.length() >= 2*bufferPrevSize*Nwave){
             concat = 1;
 
-            if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
-            {
                 // We were able to obtain the semaphore and can now access the
                 // shared resource.
                 state_env = VOLUME;
                 // We have finished accessing the shared resource.  Release the
                 // semaphore.
-                xSemaphoreGive( stateSemaphore );
-            }
 
-            if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
-            {
+
+
                 // We were able to obtain the semaphore and can now access the
                 // shared resource.
                 data = (String)volumen;
                 // We have finished accessing the shared resource.  Release the
                 // semaphore.
-                xSemaphoreGive( dataSemaphore );
-            }
 
             //asignar con semaforo
             //Serial.println(savedAudio.length());
@@ -475,25 +465,20 @@ void computeFFT(void *parameter){
             if(savedAudio.length() <= 2*1*Nwave){ //When there is less than 2*3*1024 characters in savedAudio, it is sent with the End of File
 
 
-                if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
-                {
-                    // We were able to obtain the semaphore and can now access the
-                    // shared resource.
-                    data = savedAudio;
-                    // We have finished accessing the shared resource.  Release the
-                    // semaphore.
-                    xSemaphoreGive( dataSemaphore );
-                }
 
-                if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
-                {
-                    // We were able to obtain the semaphore and can now access the
-                    // shared resource.
-                    EndOfFile = true;
-                    // We have finished accessing the shared resource.  Release the
-                    // semaphore.
-                    xSemaphoreGive( dataSemaphore );
-                }
+                // We were able to obtain the semaphore and can now access the
+                // shared resource.
+                data = savedAudio;
+                // We have finished accessing the shared resource.  Release the
+                // semaphore.
+
+
+
+                // We were able to obtain the semaphore and can now access the
+                // shared resource.
+                EndOfFile = true;
+                // We have finished accessing the shared resource.  Release the
+                // semaphore.
 
                 vTaskResume(esp32Client);
 
@@ -507,18 +492,16 @@ void computeFFT(void *parameter){
             } else {
 
                 int indFin = Nwave*2*1; //3 tramas
-                if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
-                {
-                    // We were able to obtain the semaphore and can now access the
-                    // shared resource.
-                    //data = savedAudio;
 
-                    data = savedAudio.substring(0, indFin);
+                // We were able to obtain the semaphore and can now access the
+                // shared resource.
+                //data = savedAudio;
 
-                    // We have finished accessing the shared resource.  Release the
-                    // semaphore.
-                    xSemaphoreGive( dataSemaphore );
-                }
+                data = savedAudio.substring(0, indFin);
+
+                // We have finished accessing the shared resource.  Release the
+                // semaphore.
+
 
                 savedAudio.remove(0, indFin);
 
@@ -606,15 +589,13 @@ void codeForServer( void * parameter){
                         // AUDIO DATA REQUEST FROM RASPI
                         client.println("HTTP/1.1 200 OK");
                         client.println();
-                        if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
-                        {
-                            // We were able to obtain the semaphore and can now access the
-                            // shared resource.
-                            state_env=AUDIO;
-                            // We have finished accessing the shared resource.  Release the
-                            // semaphore.
-                            xSemaphoreGive( stateSemaphore );
-                        }
+
+                        // We were able to obtain the semaphore and can now access the
+                        // shared resource.
+                        state_env=AUDIO;
+                        // We have finished accessing the shared resource.  Release the
+                        // semaphore.
+
                         Serial.print("DATAON");
                         client.stop();
                         currentLine="";
@@ -624,16 +605,14 @@ void codeForServer( void * parameter){
                         // AUDIO DATA NOT REQUESTED FROM RASPI
                         client.println("HTTP/1.1 200 OK");
                         client.println();
-                        if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
-                        {
-                            // We were able to obtain the semaphore and can now access the
-                            // shared resource.
-                            state_env=IDLE;
-                            raspiListening=false;
-                            // We have finished accessing the shared resource.  Release the
-                            // semaphore.
-                            xSemaphoreGive( stateSemaphore );
-                        }
+
+                        // We were able to obtain the semaphore and can now access the
+                        // shared resource.
+                        state_env=IDLE;
+                        raspiListening=false;
+                        // We have finished accessing the shared resource.  Release the
+                        // semaphore.
+
                         Serial.print("DATAOFF");
                         client.stop();
                         currentLine="";
@@ -644,15 +623,13 @@ void codeForServer( void * parameter){
                         client.println("HTTP/1.1 200 OK");
                         client.println();
                         Serial.println("VOLUME request detected");
-                        if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
-                        {
-                            // We were able to obtain the semaphore and can now access the
-                            // shared resource.
-                            raspiListening=true;
-                            // We have finished accessing the shared resource.  Release the
-                            // semaphore.
-                            xSemaphoreGive( stateSemaphore );
-                        }
+
+                        // We were able to obtain the semaphore and can now access the
+                        // shared resource.
+                        raspiListening=true;
+                        // We have finished accessing the shared resource.  Release the
+                        // semaphore.
+
                         client.stop();
                         currentLine="";
                         Serial.print("VOLUME");
@@ -684,55 +661,45 @@ void codeForClient( void * parameter){
         if (client.connect(raspip.c_str(), port)) {
             // send the HTTP request:
             //Send information
-            if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
-            {
-                // We were able to obtain the semaphore and can now access the
-                // shared resource.
-                switch (state_env) {
-                    case VOLUME:
-                        client.println(makeHTTPrequest("POST","/volume","application/json",data, getDelayLocalization() ,EndOfFile, esp_ip));
-                        state_env=WAITRESPONSE;
-                    break;
-                    case AUDIO:
-                        if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
-                        {
-                            // We were able to obtain the semaphore and can now access the
-                            // shared resource.
-                            client.println(makeHTTPaudio(esp_ip,data,EndOfFile));
-                            if(EndOfFile==true){
-                                EndOfFile=false;
-                                //Go back to initial state
-                                state_env=IDLE;
-                                raspiListening=false;
-                            }
-                            // We have finished accessing the shared resource.  Release the
-                            // semaphore.
-                            xSemaphoreGive( dataSemaphore );
-                        }
-                    break;
-                    default:
-                        client.println(makeHTTPrequest("POST","/error","application/json",data , getDelayLocalization(), EndOfFile, esp_ip));
+            // We were able to obtain the semaphore and can now access the
+            // shared resource.
+            switch (state_env) {
+                case VOLUME:
+                    client.println(makeHTTPrequest("POST","/volume","application/json",data, getDelayLocalization() ,EndOfFile, esp_ip));
+                    state_env=WAITRESPONSE;
+                break;
+                case AUDIO:
+
+                    // We were able to obtain the semaphore and can now access the
+                    // shared resource.
+                    client.println(makeHTTPaudio(esp_ip,data,EndOfFile));
+                    if(EndOfFile==true){
+                        EndOfFile=false;
+                        //Go back to initial state
                         state_env=IDLE;
                         raspiListening=false;
-                    break;
                     }
+                    // We have finished accessing the shared resource.  Release the
+                    // semaphore.
+
+                break;
+                default:
+                    client.println(makeHTTPrequest("POST","/error","application/json",data , getDelayLocalization(), EndOfFile, esp_ip));
+                    state_env=IDLE;
+                    raspiListening=false;
+                break;
                 // We have finished accessing the shared resource.  Release the
                 // semaphore.
-                xSemaphoreGive( stateSemaphore );
             }
         }else{
             // if you couldn't make a connection:
             Serial.println("connection failed");
-            if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
-            {
-                // We were able to obtain the semaphore and can now access the
-                // shared resource.
-                state_env=IDLE;
-                raspiListening=false;
-                // We have finished accessing the shared resource.  Release the
-                // semaphore.
-                xSemaphoreGive( stateSemaphore );
-            }
+            // We were able to obtain the semaphore and can now access the
+            // shared resource.
+            state_env=IDLE;
+            raspiListening=false;
+            // We have finished accessing the shared resource.  Release the
+            // semaphore.
             //FATAL ERROR
         }
     }
@@ -1053,18 +1020,17 @@ String makeHTTPrequest(String method, String uri, String type, String data, uint
     String localitzationToSend="";
     String postBody="";
     boolean EOFtoSend;
-    if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
-    {
-        // We were able to obtain the semaphore and can now access the
-        // shared resource.
-        //We make a local copy
-        dataToSend = data; //volume is a int value in state AUDIO.
-        localitzationToSend = uint64toString(localitzationDelta);
-        EOFtoSend=EndOfFile;
-        // We have finished accessing the shared resource.  Release the
-        // semaphore.
-        xSemaphoreGive( dataSemaphore );
-    }
+
+    // We were able to obtain the semaphore and can now access the
+    // shared resource.
+    //We make a local copy
+    dataToSend = data; //volume is a int value in state AUDIO.
+    localitzationToSend = uint64toString(localitzationDelta);
+    EOFtoSend=EndOfFile;
+    // We have finished accessing the shared resource.  Release the
+    // semaphore.
+
+
     if(localitzationToSend=="00"){
       localitzationToSend="0";
     }
