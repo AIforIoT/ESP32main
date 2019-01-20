@@ -649,7 +649,7 @@ void codeForServer( void * parameter){
                             // We were able to obtain the semaphore and can now access the
                             // shared resource
                             if(state_env==WAITRESPONSE){
-                                state_env=VOLUME;
+                                state_env=IDLE;
                             }
                             raspiListening=true;
                             // We have finished accessing the shared resource.  Release the
