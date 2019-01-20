@@ -414,7 +414,6 @@ void computeFFT(void *parameter){
         double x = FFT.MajorPeak(vReal, Nwave, samplingFrequency);
 
         if(x > 85.0 && x < 255.0){ //x is the peak frequency, it detects voice if this value is between 85 Hz and 255 Hz
-            //Serial.println("-----------------------Voz");
             isVoice = 1;
             volumen = computeVolume(tramaFFT);
         }else{
@@ -466,8 +465,6 @@ void computeFFT(void *parameter){
             }
 
             //asignar con semaforo
-            Serial.println("-------------------------------------------->Petición");
-            Serial.println((String)volumen);
             //Serial.println(savedAudio.length());
             vTaskResume(esp32Client);
 
@@ -477,7 +474,6 @@ void computeFFT(void *parameter){
 
             if(savedAudio.length() <= 2*1*Nwave){ //When there is less than 2*3*1024 characters in savedAudio, it is sent with the End of File
 
-                //Serial.println(prova);
 
                 if( xSemaphoreTake( dataSemaphore, portMAX_DELAY ) == pdTRUE )
                 {
@@ -500,7 +496,6 @@ void computeFFT(void *parameter){
                 }
 
                 vTaskResume(esp32Client);
-                Serial.println("Enviado");
 
                 /*Reiniciamos variables*/
                 savedAudio= "";
@@ -517,11 +512,9 @@ void computeFFT(void *parameter){
                     // We were able to obtain the semaphore and can now access the
                     // shared resource.
                     //data = savedAudio;
-                    Serial.println("-----------------------------savedAudio-------------------------------");
-                    Serial.println(savedAudio.substring(0, indFin));
+
                     data = savedAudio.substring(0, indFin);
-                    Serial.println("-----------------------------data-------------------------------");
-                    Serial.println(data);
+
                     // We have finished accessing the shared resource.  Release the
                     // semaphore.
                     xSemaphoreGive( dataSemaphore );
@@ -689,10 +682,8 @@ void codeForClient( void * parameter){
         client.stop();
         //if there's a successful connection:
         if (client.connect(raspip.c_str(), port)) {
-            Serial.println("connecting...");
             // send the HTTP request:
             //Send information
-            Serial.println("Information to send");
             if( xSemaphoreTake( stateSemaphore, portMAX_DELAY ) == pdTRUE )
             {
                 // We were able to obtain the semaphore and can now access the
@@ -725,7 +716,6 @@ void codeForClient( void * parameter){
                         raspiListening=false;
                     break;
                     }
-                Serial.println("Post end");
                 // We have finished accessing the shared resource.  Release the
                 // semaphore.
                 xSemaphoreGive( stateSemaphore );
@@ -985,9 +975,9 @@ void setup(){
     Serial.println("INIT sequence start");
 
     //HARDWARE CHECK
-    digitalWrite(33, HIGH);
+    digitalWrite(19, HIGH);
     delay(1000);
-    digitalWrite(33, LOW);
+    digitalWrite(19, LOW);
     delay(1000);
     digitalWrite(32, HIGH);
     delay(1000);
